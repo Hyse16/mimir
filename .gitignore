@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# IntelliJ IDEA
+.idea/
+*.iml
+out/
+
+# Java / Gradle
+.gradle/
+build/
+
+# Node.js / Next.js
+node_modules/
+.next/
+coverage/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Local runtime data
+data/
+*.log
+.omx/
+
+# Local agent and development guidance
+AGENTS.md
+develop.md
