@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg17
+    environment:
+      POSTGRES_DB: ${MIMIR_DB_NAME:-mimir}
+      POSTGRES_USER: ${MIMIR_DB_USER:-mimir}
+      POSTGRES_PASSWORD: ${MIMIR_DB_PASSWORD:-mimir_local}
+    ports:
+      - "${MIMIR_DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    volumes:
+      - mimir-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  mimir-postgres-data:

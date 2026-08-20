@@ -4,7 +4,7 @@ Mimir is a local-first personal AI workspace. The project starts with an AI-assi
 
 ## Status
 
-The repository is in **STEP 0: architecture and environment baseline**. Application scaffolding has not started yet. The accepted MVP split is a Flet action application, a Spring Boot business backend, and a Next.js operational backoffice.
+The repository has completed **STEP 1: project skeleton**. The Flet action application, Spring Boot business backend, Next.js operational backoffice, and PostgreSQL/pgvector runtime now have executable foundations. STEP 2 adds the durable blog and draft-version vertical flow.
 
 ## Planned architecture
 
@@ -26,9 +26,13 @@ Playwright is limited to an optional, local, user-approved Naver editor assistan
 
 `Local Only` is a hard boundary. When enabled, prompts, images, embeddings, telemetry, and generated content must not be sent to an external AI or cloud fallback provider.
 
-## STEP 0
+## Development evidence
 
 The accepted application boundaries are recorded in [docs/architecture/application-boundaries.md](docs/architecture/application-boundaries.md). Current machine and model findings are recorded separately in [docs/step-0-environment.md](docs/step-0-environment.md).
+
+STEP 1 versions, run commands, verification, database impact, and known gaps are recorded in [docs/step-1-project-skeleton.md](docs/step-1-project-skeleton.md).
+
+## STEP 0 model probes
 
 Run the reproducible environment probe:
 
@@ -54,17 +58,19 @@ Run the local vision benchmark with the checked-in non-sensitive fixtures:
 ./scripts/step0/benchmark-vision.sh gemma4:latest
 ```
 
-Flet, Spring Boot, and Next.js scaffolding begins after the architecture baseline checks pass. Hermes Memory and Skill reliability is deferred until after the core blog workflow and does not block the skeleton.
+Hermes Memory and Skill reliability is deferred until after the core blog workflow and does not block the skeleton.
 
 ## Repository layout
 
 ```text
 docs/          Public technical notes and validation results
+application/   Python and Flet action application
+backend/       Java and Spring Boot business backend
+backoffice/    Next.js operational backoffice
+infra/         PostgreSQL and pgvector local runtime
 scripts/step0  Reproducible local environment and model probes
 fixtures/step0 Synthetic, non-sensitive benchmark inputs
 ```
-
-The planned application directories (`application/`, `backend/`, `backoffice/`, and `infra/`) will be introduced in STEP 1.
 
 ## License
 

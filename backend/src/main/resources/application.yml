@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: mimir-backend
+  datasource:
+    url: ${MIMIR_DB_URL:jdbc:postgresql://localhost:5432/mimir}
+    username: ${MIMIR_DB_USER:mimir}
+    password: ${MIMIR_DB_PASSWORD:mimir_local}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+server:
+  port: ${MIMIR_BACKEND_PORT:8080}

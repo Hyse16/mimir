@@ -1,0 +1,35 @@
+[project]
+name = "mimir-application"
+version = "0.1.0"
+description = "Flet desktop application for the Mimir personal assistant"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "flet[all]>=0.80,<1.0",
+]
+
+[project.scripts]
+mimir-application = "mimir_application.main:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mimir_application"]
+
+[tool.flet]
+org = "com.mimir"
+product = "Mimir"
+company = "Mimir"
+
+[tool.flet.app]
+path = "src"
+module = "mimir_application/main.py"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<10",
+]
