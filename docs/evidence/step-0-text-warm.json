@@ -1,0 +1,41 @@
+{
+  "model": "qwen2.5:7b",
+  "run_count": 3,
+  "total_seconds": 9.347774459,
+  "average_seconds": 3.1159248196666667,
+  "minimum_seconds": 1.659006875,
+  "maximum_seconds": 6.027088042,
+  "average_generation_tokens_per_second": 24.413463440678157,
+  "runs": [
+    {
+      "model": "qwen2.5:7b",
+      "response": "로컬 우선 AI 워크스페이스는 데이터 처리 속도가 빠르고, 프라이버시 보호가 우수합니다.",
+      "done_reason": "stop",
+      "total_seconds": 6.027088042,
+      "load_seconds": 4.273705625,
+      "prompt_tokens": 60,
+      "output_tokens": 36,
+      "generation_tokens_per_second": 24.404033173215762
+    },
+    {
+      "model": "qwen2.5:7b",
+      "response": "로컬 우선 AI 워크스페이스는 데이터 처리 속도가 빠르고, 프라이버시 보호가 우수합니다.",
+      "done_reason": "stop",
+      "total_seconds": 1.661679542,
+      "load_seconds": 0.141148625,
+      "prompt_tokens": 60,
+      "output_tokens": 36,
+      "generation_tokens_per_second": 24.438889877004495
+    },
+    {
+      "model": "qwen2.5:7b",
+      "response": "로컬 우선 AI 워크스페이스는 데이터 처리 속도가 빠르고, 프라이버시 보호가 우수합니다.",
+      "done_reason": "stop",
+      "total_seconds": 1.659006875,
+      "load_seconds": 0.137628333,
+      "prompt_tokens": 60,
+      "output_tokens": 36,
+      "generation_tokens_per_second": 24.397467271814218
+    }
+  ]
+}

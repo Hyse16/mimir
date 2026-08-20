@@ -1,0 +1,320 @@
+{
+  "model": "gemma4:latest",
+  "image_count": 20,
+  "configured_batch_size": 3,
+  "batch_count": 7,
+  "total_seconds": 99.127627918,
+  "batches": [
+    {
+      "model": "gemma4:latest",
+      "expected_images": 3,
+      "analysis": [
+        {
+          "displayOrder": 1,
+          "category": "food and drink",
+          "description": "A single slice of cake is presented on a white plate, placed on a light wooden surface next to a silver fork.",
+          "objects": [
+            "cake slice",
+            "white plate",
+            "fork",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 2,
+          "category": "food and drink",
+          "description": "A glass of iced coffee or latte is shown next to a croissant, both resting on a wooden surface.",
+          "objects": [
+            "iced coffee/latte",
+            "croissant",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 3,
+          "category": "interior design",
+          "description": "A bright cafe interior featuring several small tables and wooden chairs arranged around a room. A potted plant adds greenery to the space.",
+          "objects": [
+            "tables",
+            "chairs",
+            "potted plant",
+            "window"
+          ],
+          "visibleText": null
+        }
+      ],
+      "done_reason": "stop",
+      "total_seconds": 17.193758875,
+      "load_seconds": 0.426901084,
+      "prompt_tokens": 840,
+      "output_tokens": 289
+    },
+    {
+      "model": "gemma4:latest",
+      "expected_images": 3,
+      "analysis": [
+        {
+          "displayOrder": 1,
+          "category": "food and drink",
+          "description": "A single slice of cake is presented on a white plate, placed on a light wooden surface next to a silver fork.",
+          "objects": [
+            "cake slice",
+            "white plate",
+            "fork",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 2,
+          "category": "food and drink",
+          "description": "A glass of iced coffee or latte is shown next to a croissant, both resting on a wooden surface.",
+          "objects": [
+            "iced coffee/latte",
+            "croissant",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 3,
+          "category": "interior design",
+          "description": "A bright cafe interior featuring several small tables and wooden chairs arranged around a room. A potted plant adds greenery to the space.",
+          "objects": [
+            "tables",
+            "chairs",
+            "potted plant",
+            "window"
+          ],
+          "visibleText": null
+        }
+      ],
+      "done_reason": "stop",
+      "total_seconds": 13.907188834,
+      "load_seconds": 0.430078125,
+      "prompt_tokens": 840,
+      "output_tokens": 289
+    },
+    {
+      "model": "gemma4:latest",
+      "expected_images": 3,
+      "analysis": [
+        {
+          "displayOrder": 1,
+          "category": "food and drink",
+          "description": "A single slice of cake is presented on a white plate, placed on a light wooden surface next to a silver fork.",
+          "objects": [
+            "cake slice",
+            "white plate",
+            "fork",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 2,
+          "category": "food and drink",
+          "description": "A glass of iced coffee or latte is shown next to a croissant, both resting on a wooden surface.",
+          "objects": [
+            "iced coffee/latte",
+            "croissant",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 3,
+          "category": "interior design",
+          "description": "A bright cafe interior featuring several small tables and wooden chairs arranged around a room. A potted plant adds greenery to the space.",
+          "objects": [
+            "tables",
+            "chairs",
+            "potted plant",
+            "window"
+          ],
+          "visibleText": null
+        }
+      ],
+      "done_reason": "stop",
+      "total_seconds": 13.78039775,
+      "load_seconds": 0.706739375,
+      "prompt_tokens": 840,
+      "output_tokens": 289
+    },
+    {
+      "model": "gemma4:latest",
+      "expected_images": 3,
+      "analysis": [
+        {
+          "displayOrder": 1,
+          "category": "food and drink",
+          "description": "A single slice of cake is presented on a white plate, placed on a light wooden surface next to a silver fork.",
+          "objects": [
+            "cake slice",
+            "white plate",
+            "fork",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 2,
+          "category": "food and drink",
+          "description": "A glass of iced coffee or latte is shown next to a croissant, both resting on a wooden surface.",
+          "objects": [
+            "iced coffee/latte",
+            "croissant",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 3,
+          "category": "interior design",
+          "description": "A bright cafe interior featuring several small tables and wooden chairs arranged around a room. A potted plant adds greenery to the space.",
+          "objects": [
+            "tables",
+            "chairs",
+            "potted plant",
+            "window"
+          ],
+          "visibleText": null
+        }
+      ],
+      "done_reason": "stop",
+      "total_seconds": 13.393739959,
+      "load_seconds": 0.412162959,
+      "prompt_tokens": 840,
+      "output_tokens": 289
+    },
+    {
+      "model": "gemma4:latest",
+      "expected_images": 3,
+      "analysis": [
+        {
+          "displayOrder": 1,
+          "category": "food and drink",
+          "description": "A single slice of cake is presented on a white plate, placed on a light wooden surface next to a silver fork.",
+          "objects": [
+            "cake slice",
+            "white plate",
+            "fork",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 2,
+          "category": "food and drink",
+          "description": "A glass of iced coffee or latte is shown next to a croissant, both resting on a wooden surface.",
+          "objects": [
+            "iced coffee/latte",
+            "croissant",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 3,
+          "category": "interior design",
+          "description": "A bright cafe interior featuring several small tables and wooden chairs arranged around a room. A potted plant adds greenery to the space.",
+          "objects": [
+            "tables",
+            "chairs",
+            "potted plant",
+            "window"
+          ],
+          "visibleText": null
+        }
+      ],
+      "done_reason": "stop",
+      "total_seconds": 14.542249125,
+      "load_seconds": 0.4800095,
+      "prompt_tokens": 840,
+      "output_tokens": 289
+    },
+    {
+      "model": "gemma4:latest",
+      "expected_images": 3,
+      "analysis": [
+        {
+          "displayOrder": 1,
+          "category": "food and drink",
+          "description": "A single slice of cake is presented on a white plate, placed on a light wooden surface next to a silver fork.",
+          "objects": [
+            "cake slice",
+            "white plate",
+            "fork",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 2,
+          "category": "food and drink",
+          "description": "A glass of iced coffee or latte is shown next to a croissant, both resting on a wooden surface.",
+          "objects": [
+            "iced coffee/latte",
+            "croissant",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 3,
+          "category": "interior design",
+          "description": "A bright cafe interior featuring several small tables and wooden chairs arranged around a room. A potted plant adds greenery to the space.",
+          "objects": [
+            "tables",
+            "chairs",
+            "potted plant",
+            "window"
+          ],
+          "visibleText": null
+        }
+      ],
+      "done_reason": "stop",
+      "total_seconds": 13.40650075,
+      "load_seconds": 0.426462125,
+      "prompt_tokens": 840,
+      "output_tokens": 289
+    },
+    {
+      "model": "gemma4:latest",
+      "expected_images": 2,
+      "analysis": [
+        {
+          "displayOrder": 1,
+          "category": "food and drink",
+          "description": "A single slice of chocolate cake is placed on a white plate, which rests on a light wooden surface. To the right of the plate is a silver-colored fork.",
+          "objects": [
+            "slice of cake",
+            "white plate",
+            "fork",
+            "wooden table"
+          ],
+          "visibleText": null
+        },
+        {
+          "displayOrder": 2,
+          "category": "food and drink",
+          "description": "A glass containing a layered coffee beverage (latte art visible) is positioned on a wooden table. Next to the glass, there is a croissant resting on a small brown paper napkin.",
+          "objects": [
+            "coffee drink in glass",
+            "croissant",
+            "paper napkin",
+            "wooden table"
+          ],
+          "visibleText": null
+        }
+      ],
+      "done_reason": "stop",
+      "total_seconds": 12.903792625,
+      "load_seconds": 0.385933209,
+      "prompt_tokens": 578,
+      "output_tokens": 228
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+# Initial REST and SSE contract
+
+Status: STEP 0 contract baseline; implementation starts in STEP 1
+
+## Contract ownership
+
+Spring Boot owns the REST and SSE contract under `/api/v1`. Flet and Next.js are API clients and must treat every response as external input. Domain state is never inferred only from client navigation or local browser state.
+
+All JSON uses UTF-8, ISO-8601 timestamps with offsets, stable string identifiers, and explicit nullable fields. Validation failures use field-level errors. Unknown internal exceptions are not returned to clients.
+
+## Error envelope
+
+```json
+{
+  "code": "BLOG_IMAGE_LIMIT_EXCEEDED",
+  "message": "A blog post supports at most 20 images.",
+  "fieldErrors": [
+    {
+      "field": "images",
+      "reason": "MAX_20"
+    }
+  ],
+  "traceId": "01J..."
+}
+```
+
+The `traceId` correlates non-sensitive logs. Prompts, browser cookies, OAuth tokens, image bytes, and private message content are excluded from the error envelope and default logs.
+
+## Blog resources
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/v1/blog-posts` | Create a draft post and factual user context |
+| `GET` | `/api/v1/blog-posts` | Search, filter, sort, and paginate posts |
+| `GET` | `/api/v1/blog-posts/{postId}` | Read post detail, current version summary, and ordered assets |
+| `PATCH` | `/api/v1/blog-posts/{postId}` | Update editable metadata and lifecycle state |
+| `POST` | `/api/v1/blog-posts/{postId}/archive` | Archive without destructive deletion |
+| `POST` | `/api/v1/blog-posts/{postId}/assets` | Upload and append validated assets, enforcing the total limit of 20 |
+| `PUT` | `/api/v1/blog-posts/{postId}/assets/order` | Persist complete display order |
+| `POST` | `/api/v1/blog-posts/{postId}/versions` | Save a user edit or AI revision as an immutable version |
+| `GET` | `/api/v1/blog-posts/{postId}/versions` | List version summaries newest first |
+| `GET` | `/api/v1/blog-posts/{postId}/versions/{versionId}` | Read one version |
+| `POST` | `/api/v1/blog-posts/{postId}/versions/{versionId}/select` | Select a version as the current approved draft |
+| `POST` | `/api/v1/blog-posts/{postId}/prepare-naver` | Build a preview and copy/export payload from the selected version |
+
+Destructive deletion is excluded from the first vertical slice. Archive is reversible and keeps version and job history coherent.
+
+## Revision request
+
+```json
+{
+  "baseVersionId": "01J...",
+  "instruction": "광고처럼 보이는 표현을 줄여줘",
+  "source": "USER_EDIT"
+}
+```
+
+The backend rejects a stale or unrelated `baseVersionId`. It never overwrites an existing version. AI-generated versions use `source: AI_GENERATED` and retain the provider route and job identifier as metadata without storing secrets.
+
+## Job resources
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/v1/blog-posts/{postId}/generation-jobs` | Start image analysis and grounded draft generation |
+| `GET` | `/api/v1/jobs/{jobId}` | Read durable status and counts |
+| `POST` | `/api/v1/jobs/{jobId}/retry-failed` | Retry only failed items from a partial failure |
+| `POST` | `/api/v1/jobs/{jobId}/cancel` | Request cancellation |
+| `GET` | `/api/v1/jobs/{jobId}/events` | Receive SSE progress events |
+
+## SSE event shape
+
+```text
+event: job-progress
+id: 18
+data: {"jobId":"01J...","status":"RUNNING","total":20,"processed":15,"failed":1,"stage":"IMAGE_ANALYSIS","occurredAt":"2026-08-20T14:10:00+09:00"}
+```
+
+Events are resumable by event ID. The durable job record remains authoritative after reconnect. A subset of image failures produces `PARTIAL_FAILED`; successful image analysis remains available and only failed items are eligible for targeted retry.
+
+## System status
+
+`GET /api/v1/system/status` returns component availability and privacy-safe metadata for Flet and the backoffice. It does not return credentials, filesystem paths containing user names, raw prompts, browser profiles, cookies, or provider payloads.
