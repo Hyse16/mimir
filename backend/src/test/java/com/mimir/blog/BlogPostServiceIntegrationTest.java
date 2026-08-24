@@ -2,6 +2,7 @@ package com.mimir.blog;
 
 import static com.mimir.blog.BlogApiModels.CreateBlogPostRequest;
 import static com.mimir.blog.BlogApiModels.CreateDraftVersionRequest;
+import static com.mimir.blog.BlogApiModels.UpdateBlogPostRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -56,10 +57,12 @@ class BlogPostServiceIntegrationTest {
                 "성수 카페 방문기",
                 "과장 표현을 줄인 두 번째 본문",
                 List.of("#카페", "카페", "성수"),
+                "일요일에 친구와 다시 방문",
                 DraftSource.USER_EDIT));
 
         assertThat(revised.currentVersion().versionNumber()).isEqualTo(2);
         assertThat(revised.currentVersion().tags()).containsExactly("카페", "성수");
+        assertThat(revised.visitContext()).isEqualTo("일요일에 친구와 다시 방문");
         assertThat(revised.versions()).hasSize(2);
 
         var restored = service.selectVersion(created.id(), created.currentVersionId());
@@ -82,6 +85,7 @@ class BlogPostServiceIntegrationTest {
                 "수정 초안",
                 "수정 본문",
                 List.of(),
+                null,
                 DraftSource.USER_EDIT));
 
         assertThatThrownBy(() -> service.addVersion(created.id(), new CreateDraftVersionRequest(
@@ -89,8 +93,10 @@ class BlogPostServiceIntegrationTest {
                 "충돌 초안",
                 "충돌 본문",
                 List.of(),
+                "저장되면 안 되는 메모",
                 DraftSource.USER_EDIT)))
                 .isInstanceOf(StaleDraftVersionException.class);
+        assertThat(service.detail(created.id()).visitContext()).isEqualTo("확인된 사실");
     }
 
     @Test
@@ -122,6 +128,7 @@ class BlogPostServiceIntegrationTest {
                 "수정된 원본",
                 "현재 선택된 본문",
                 List.of("기록", "수정"),
+                null,
                 DraftSource.USER_EDIT));
 
         var duplicated = service.duplicate(created.id());
@@ -134,5 +141,20 @@ class BlogPostServiceIntegrationTest {
         assertThat(duplicated.currentVersion().body()).isEqualTo(revised.currentVersion().body());
         assertThat(duplicated.currentVersion().tags()).containsExactly("기록", "수정");
         assertThat(duplicated.versions()).hasSize(1);
+    }
+
+    @Test
+    void updatesLifecycleStatusWithoutCreatingAnotherVersion() {
+        var created = service.create(new CreateBlogPostRequest(
+                "검토할 글",
+                "사실 메모",
+                "검토 전 본문",
+                List.of("검토")));
+
+        var ready = service.update(created.id(), new UpdateBlogPostRequest(null, BlogPostStatus.READY, null));
+
+        assertThat(ready.status()).isEqualTo(BlogPostStatus.READY);
+        assertThat(ready.currentVersionId()).isEqualTo(created.currentVersionId());
+        assertThat(ready.versions()).hasSize(1);
     }
 }

@@ -25,6 +25,16 @@ class DraftVersion:
 
 
 @dataclass(frozen=True)
+class BlogPostSummary:
+    id: str
+    title: str
+    status: str
+    current_version_id: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
 class BlogPostDetail:
     id: str
     title: str
@@ -89,6 +99,19 @@ class MimirApiClient:
         )
         return self._blog_post_detail(payload)
 
+    def get_blog_posts(self, *, size: int = 20) -> tuple[BlogPostSummary, ...]:
+        payload = self._request("GET", f"/blog-posts?size={size}&sort=updatedAt&direction=desc")
+        try:
+            if not isinstance(payload, dict) or not isinstance(payload["items"], list):
+                raise TypeError
+            return tuple(self._blog_post_summary(item) for item in payload["items"])
+        except (KeyError, TypeError) as error:
+            raise BackendUnavailableError("Mimir backend returned an invalid blog list.") from error
+
+    def get_blog_post(self, post_id: str) -> BlogPostDetail:
+        payload = self._request("GET", f"/blog-posts/{post_id}")
+        return self._blog_post_detail(payload)
+
     def add_blog_version(
         self,
         post_id: str,
@@ -97,6 +120,7 @@ class MimirApiClient:
         title: str,
         body: str,
         tags: list[str],
+        visit_context: str | None = None,
     ) -> BlogPostDetail:
         payload = self._request(
             "POST",
@@ -106,6 +130,7 @@ class MimirApiClient:
                 "title": title,
                 "body": body,
                 "tags": tags,
+                "visitContext": visit_context,
                 "source": "USER_EDIT",
             },
         )
@@ -161,6 +186,19 @@ class MimirApiClient:
             )
         except (KeyError, TypeError) as error:
             raise BackendUnavailableError("Mimir backend returned an invalid blog post.") from error
+
+    @staticmethod
+    def _blog_post_summary(payload: Any) -> BlogPostSummary:
+        if not isinstance(payload, dict):
+            raise TypeError
+        return BlogPostSummary(
+            id=str(payload["id"]),
+            title=str(payload["title"]),
+            status=str(payload["status"]),
+            current_version_id=str(payload["currentVersionId"]),
+            created_at=str(payload["createdAt"]),
+            updated_at=str(payload["updatedAt"]),
+        )
 
     @staticmethod
     def _draft_version(payload: Any) -> DraftVersion:

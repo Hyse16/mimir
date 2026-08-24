@@ -4,7 +4,7 @@ Mimir is a local-first personal AI workspace. The project starts with an AI-assi
 
 ## Status
 
-The repository has completed **STEP 1: project skeleton**. The Flet action application, Spring Boot business backend, Next.js operational backoffice, and PostgreSQL/pgvector runtime now have executable foundations. STEP 2 adds the durable blog and draft-version vertical flow.
+The repository has completed **STEP 1: project skeleton** and is implementing **STEP 2: Blog CRUD**. Durable blog drafts, immutable versions, Flet editing, and backoffice search, review, editing, duplication, status, and archive operations are available. Image assets remain the open boundary between STEP 2 and the STEP 3 image pipeline.
 
 ## Planned architecture
 
@@ -31,6 +31,8 @@ Playwright is limited to an optional, local, user-approved Naver editor assistan
 The accepted application boundaries are recorded in [docs/architecture/application-boundaries.md](docs/architecture/application-boundaries.md). Current machine and model findings are recorded separately in [docs/step-0-environment.md](docs/step-0-environment.md).
 
 STEP 1 versions, run commands, verification, database impact, and known gaps are recorded in [docs/step-1-project-skeleton.md](docs/step-1-project-skeleton.md).
+
+Current STEP 2 delivery, verification, and remaining contract decisions are recorded in [docs/step-2-blog-crud.md](docs/step-2-blog-crud.md).
 
 ## STEP 0 model probes
 

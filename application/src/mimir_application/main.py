@@ -43,6 +43,13 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         hint_text="쉼표로 구분 (예: 서울, 카페, 산책)",
         key="blog-tags",
     )
+    post_selector = ft.Dropdown(
+        label="기존 게시글",
+        hint_text="목록을 새로고침한 뒤 수정할 게시글을 선택하세요.",
+        expand=True,
+        key="blog-selector",
+    )
+    selector_text = ft.Text("새 초안을 작성하거나 기존 게시글을 불러올 수 있습니다.", color="#5B6470")
     result_text = ft.Text("아직 저장된 초안이 없습니다.", color="#5B6470")
     save_button = ft.FilledButton("첫 초안 저장", icon=ft.Icons.SAVE_OUTLINED)
 
@@ -62,6 +69,66 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
 
     def parse_tags() -> list[str]:
         return [tag.strip() for tag in (tags_field.value or "").split(",") if tag.strip()]
+
+    def show_post(post: BlogPostDetail) -> None:
+        nonlocal current_post
+        current_post = post
+        post_selector.value = post.id
+        title_field.value = post.current_version.title
+        context_field.value = post.visit_context
+        body_field.value = post.current_version.body
+        tags_field.value = ", ".join(post.current_version.tags)
+        save_button.text = "새 버전 저장"
+        selector_text.value = f"{post.title} · 현재 버전 {post.current_version.version_number} · {post.status}"
+        selector_text.color = "#16803C"
+        result_text.value = "기존 초안을 불러왔습니다. 저장하면 새 버전으로 보관됩니다."
+        result_text.color = "#5B6470"
+
+    def refresh_posts(_: ft.ControlEvent | None = None) -> None:
+        try:
+            posts = client.get_blog_posts()
+            post_selector.options = [
+                ft.DropdownOption(key=post.id, text=f"{post.title} · {post.status}")
+                for post in posts
+            ]
+            selector_text.value = f"최근 게시글 {len(posts)}개를 불러왔습니다."
+            selector_text.color = "#16803C"
+        except (ApiRequestError, BackendUnavailableError):
+            selector_text.value = "게시글 목록을 불러오지 못했습니다."
+            selector_text.color = "#B42318"
+        page.update()
+
+    def load_selected(_: ft.ControlEvent) -> None:
+        if not post_selector.value:
+            post_selector.error_text = "불러올 게시글을 선택해주세요."
+            page.update()
+            return
+        post_selector.error_text = None
+        try:
+            show_post(client.get_blog_post(post_selector.value))
+        except ApiRequestError as error:
+            selector_text.value = f"게시글을 불러오지 못했습니다: {error}"
+            selector_text.color = "#B42318"
+        except BackendUnavailableError:
+            selector_text.value = "게시글을 불러오지 못했습니다: 업무 서버에 연결할 수 없습니다."
+            selector_text.color = "#B42318"
+        page.update()
+
+    def start_new(_: ft.ControlEvent) -> None:
+        nonlocal current_post
+        current_post = None
+        post_selector.value = None
+        post_selector.error_text = None
+        title_field.value = ""
+        context_field.value = ""
+        body_field.value = ""
+        tags_field.value = ""
+        save_button.text = "첫 초안 저장"
+        selector_text.value = "새 게시글 작성 모드입니다."
+        selector_text.color = "#5B6470"
+        result_text.value = "아직 저장된 초안이 없습니다."
+        result_text.color = "#5B6470"
+        page.update()
 
     def save_draft(_: ft.ControlEvent) -> None:
         nonlocal current_post
@@ -91,6 +158,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                     title=title,
                     body=body_field.value or "",
                     tags=parse_tags(),
+                    visit_context=context_field.value or "",
                 )
             version = current_post.current_version
             result_text.value = (
@@ -174,6 +242,16 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                                 "저장할 때마다 이전 내용을 덮어쓰지 않고 새 버전으로 보관합니다.",
                                 color="#5B6470",
                             ),
+                            ft.Row(
+                                controls=[
+                                    post_selector,
+                                    ft.OutlinedButton("목록 새로고침", icon=ft.Icons.REFRESH, on_click=refresh_posts),
+                                    ft.OutlinedButton("불러오기", icon=ft.Icons.DOWNLOAD_OUTLINED, on_click=load_selected),
+                                    ft.TextButton("새 글", icon=ft.Icons.ADD, on_click=start_new),
+                                ]
+                            ),
+                            selector_text,
+                            ft.Divider(height=20, color="#E4E7EC"),
                             title_field,
                             context_field,
                             body_field,

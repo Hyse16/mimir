@@ -156,6 +156,8 @@ public class BlogPostService {
         if (!request.baseVersionId().equals(post.getCurrentVersionId())) {
             throw new StaleDraftVersionException();
         }
+        BlogContextEntity context = contextRepository.findById(postId)
+                .orElseThrow(() -> new IllegalStateException("Blog context is missing."));
         int nextVersion = versionRepository.findMaximumVersionNumber(postId) + 1;
         Instant now = clock.instant();
         BlogDraftVersionEntity version = versionRepository.save(new BlogDraftVersionEntity(
@@ -167,6 +169,9 @@ public class BlogPostService {
                 normalizedText(request.body()),
                 normalizeTags(request.tags()),
                 now));
+        if (request.visitContext() != null) {
+            context.update(request.visitContext().trim(), now);
+        }
         post.selectVersion(version.getId(), version.getTitle(), now);
         return detail(postId);
     }

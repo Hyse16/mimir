@@ -162,12 +162,20 @@ async function getJson(path: string): Promise<unknown | null> {
   }
 }
 
-async function postJson(path: string): Promise<unknown | null> {
+async function sendJson(
+  path: string,
+  method: "POST" | "PATCH",
+  body?: Record<string, unknown>,
+): Promise<unknown | null> {
   try {
     const response = await fetch(`${baseUrl()}${path}`, {
-      method: "POST",
+      method,
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(5000),
     });
     return response.ok ? await response.json() : null;
@@ -196,11 +204,33 @@ export async function getBlogPost(id: string): Promise<BlogPostDetail | null> {
 }
 
 export async function archiveBlogPost(id: string): Promise<BlogPostDetail | null> {
-  const payload = await postJson(`/blog-posts/${encodeURIComponent(id)}/archive`);
+  const payload = await sendJson(`/blog-posts/${encodeURIComponent(id)}/archive`, "POST");
   return isBlogPostDetail(payload) ? payload : null;
 }
 
 export async function duplicateBlogPost(id: string): Promise<BlogPostDetail | null> {
-  const payload = await postJson(`/blog-posts/${encodeURIComponent(id)}/duplicate`);
+  const payload = await sendJson(`/blog-posts/${encodeURIComponent(id)}/duplicate`, "POST");
+  return isBlogPostDetail(payload) ? payload : null;
+}
+
+export async function saveBlogVersion(
+  id: string,
+  input: {
+    baseVersionId: string;
+    title: string;
+    body: string;
+    tags: string[];
+    visitContext: string;
+  },
+): Promise<BlogPostDetail | null> {
+  const payload = await sendJson(`/blog-posts/${encodeURIComponent(id)}/versions`, "POST", {
+    ...input,
+    source: "USER_EDIT",
+  });
+  return isBlogPostDetail(payload) ? payload : null;
+}
+
+export async function updateBlogPostStatus(id: string, status: string): Promise<BlogPostDetail | null> {
+  const payload = await sendJson(`/blog-posts/${encodeURIComponent(id)}`, "PATCH", { status });
   return isBlogPostDetail(payload) ? payload : null;
 }

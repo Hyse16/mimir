@@ -51,12 +51,15 @@ Destructive deletion is excluded from the first vertical slice. Archive is rever
 ```json
 {
   "baseVersionId": "01J...",
-  "instruction": "광고처럼 보이는 표현을 줄여줘",
+  "title": "성수 카페 방문기",
+  "body": "수정된 본문",
+  "tags": ["성수", "카페"],
+  "visitContext": "일요일 오후에 친구와 방문",
   "source": "USER_EDIT"
 }
 ```
 
-The backend rejects a stale or unrelated `baseVersionId`. It never overwrites an existing version. AI-generated versions use `source: AI_GENERATED` and retain the provider route and job identifier as metadata without storing secrets.
+The backend rejects a stale or unrelated `baseVersionId`. It never overwrites an existing version. When `visitContext` is present, the factual context and new draft version are committed in the same transaction. AI-generated versions use `source: AI_GENERATED` and retain the provider route and job identifier as metadata without storing secrets.
 
 ## Job resources
 

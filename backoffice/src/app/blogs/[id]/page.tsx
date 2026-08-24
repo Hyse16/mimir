@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { archiveBlogPostAction, duplicateBlogPostAction } from "@/app/blogs/actions";
+import {
+  archiveBlogPostAction,
+  duplicateBlogPostAction,
+  saveBlogDraftAction,
+  updateBlogStatusAction,
+} from "@/app/blogs/actions";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmActionForm } from "@/components/confirm-action-form";
-import { getBlogPost } from "@/lib/mimir-api";
+import { BLOG_POST_STATUSES, getBlogPost } from "@/lib/mimir-api";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +25,8 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
   const returnTo = safeReturnTo(single(query.returnTo));
   const archiveAction = archiveBlogPostAction.bind(null, post.id, returnTo);
   const duplicateAction = duplicateBlogPostAction.bind(null, post.id, returnTo);
+  const saveAction = saveBlogDraftAction.bind(null, post.id, returnTo);
+  const statusAction = updateBlogStatusAction.bind(null, post.id, returnTo);
   const notice = single(query.notice);
   const error = single(query.error);
 
@@ -32,6 +39,8 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
       </header>
 
       {notice === "duplicated" && <p className="noticeBanner" role="status">독립된 복사본을 만들었습니다.</p>}
+      {notice === "saved" && <p className="noticeBanner" role="status">수정 내용을 새 버전으로 저장했습니다.</p>}
+      {notice === "status" && <p className="noticeBanner" role="status">게시글 상태를 변경했습니다.</p>}
       {error && <p className="noticeBanner error" role="alert">요청을 처리하지 못했습니다. 백엔드 연결 상태를 확인해주세요.</p>}
 
       <section className="detailGrid">
@@ -49,9 +58,25 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
         </aside>
       </section>
 
+      <section className="panel editPanel">
+        <div className="panelHeader"><div><h2>현재 초안 편집</h2><p>저장할 때마다 기존 내용을 덮어쓰지 않고 새 버전을 생성합니다.</p></div></div>
+        <form action={saveAction} className="draftForm">
+          <input name="baseVersionId" type="hidden" value={post.currentVersionId} />
+          <label><span>제목</span><input defaultValue={post.currentVersion.title} maxLength={200} name="title" required /></label>
+          <label><span>사실 메모</span><textarea defaultValue={post.visitContext} maxLength={10000} name="visitContext" rows={4} /></label>
+          <label><span>본문</span><textarea defaultValue={post.currentVersion.body} maxLength={100000} name="body" rows={14} /></label>
+          <label><span>태그</span><input defaultValue={post.currentVersion.tags.join(", ")} name="tags" placeholder="쉼표로 구분" /></label>
+          <div className="formActions"><button className="primaryButton" type="submit">새 버전 저장</button></div>
+        </form>
+      </section>
+
       <section className="panel actionPanel">
-        <div><h2>게시글 관리</h2><p>복제본은 현재 선택된 초안을 새 게시글의 첫 버전으로 저장합니다.</p></div>
+        <div><h2>게시글 관리</h2><p>상태 변경, 복제, 보관은 본문 버전과 독립적으로 관리됩니다.</p></div>
         <div className="actionButtons">
+          <form action={statusAction} className="statusForm">
+            <label><span>상태</span><select defaultValue={post.status} name="status">{BLOG_POST_STATUSES.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></label>
+            <button className="actionButton" type="submit">상태 저장</button>
+          </form>
           <ConfirmActionForm action={duplicateAction} label="복제" message="현재 초안을 독립된 새 게시글로 복제할까요?" />
           {post.status !== "ARCHIVED" && <ConfirmActionForm action={archiveAction} label="보관" message="이 게시글을 보관 상태로 변경할까요? 기존 버전은 유지됩니다." tone="danger" />}
         </div>
