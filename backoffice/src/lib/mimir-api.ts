@@ -40,6 +40,24 @@ export type BlogPostPage = {
   totalPages: number;
 };
 
+export type BlogPostQuery = {
+  query?: string;
+  status?: string;
+  page?: number;
+  size?: number;
+  sort?: string;
+  direction?: string;
+};
+
+export const BLOG_POST_STATUSES = [
+  "DRAFT",
+  "GENERATING",
+  "REVIEW_REQUIRED",
+  "READY",
+  "PUBLISHED",
+  "ARCHIVED",
+] as const;
+
 const baseUrl = () =>
   (process.env.MIMIR_API_BASE_URL ?? "http://127.0.0.1:8080/api/v1").replace(/\/$/, "");
 
@@ -144,12 +162,45 @@ async function getJson(path: string): Promise<unknown | null> {
   }
 }
 
-export async function getBlogPosts(): Promise<BlogPostPage | null> {
-  const payload = await getJson("/blog-posts?size=100&sort=updatedAt&direction=desc");
+async function postJson(path: string): Promise<unknown | null> {
+  try {
+    const response = await fetch(`${baseUrl()}${path}`, {
+      method: "POST",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5000),
+    });
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getBlogPosts(query: BlogPostQuery = {}): Promise<BlogPostPage | null> {
+  const params = new URLSearchParams({
+    page: String(query.page ?? 0),
+    size: String(query.size ?? 20),
+    sort: query.sort ?? "updatedAt",
+    direction: query.direction ?? "desc",
+  });
+  if (query.query) params.set("query", query.query);
+  if (query.status) params.set("status", query.status);
+
+  const payload = await getJson(`/blog-posts?${params.toString()}`);
   return isBlogPostPage(payload) ? payload : null;
 }
 
 export async function getBlogPost(id: string): Promise<BlogPostDetail | null> {
   const payload = await getJson(`/blog-posts/${encodeURIComponent(id)}`);
+  return isBlogPostDetail(payload) ? payload : null;
+}
+
+export async function archiveBlogPost(id: string): Promise<BlogPostDetail | null> {
+  const payload = await postJson(`/blog-posts/${encodeURIComponent(id)}/archive`);
+  return isBlogPostDetail(payload) ? payload : null;
+}
+
+export async function duplicateBlogPost(id: string): Promise<BlogPostDetail | null> {
+  const payload = await postJson(`/blog-posts/${encodeURIComponent(id)}/duplicate`);
   return isBlogPostDetail(payload) ? payload : null;
 }

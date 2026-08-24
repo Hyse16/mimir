@@ -26,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class BlogPostService {
 
     private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_TITLE_LENGTH = 200;
+    private static final String COPY_SUFFIX = " (복사본)";
     private static final List<String> ALLOWED_SORT_FIELDS = List.of("createdAt", "updatedAt", "title", "status");
 
     private final BlogPostRepository postRepository;
@@ -185,6 +187,17 @@ public class BlogPostService {
         return detail(postId);
     }
 
+    @Transactional
+    public BlogPostDetailResponse duplicate(UUID postId) {
+        BlogPostDetailResponse source = detail(postId);
+        DraftVersionResponse selected = source.currentVersion();
+        return create(new CreateBlogPostRequest(
+                copyTitle(selected.title()),
+                source.visitContext(),
+                selected.body(),
+                selected.tags()));
+    }
+
     private BlogPostEntity requiredPost(UUID postId) {
         return postRepository.findById(postId).orElseThrow(() -> new BlogNotFoundException(postId));
     }
@@ -237,5 +250,10 @@ public class BlogPostService {
             }
         }
         return List.copyOf(normalized);
+    }
+
+    private static String copyTitle(String title) {
+        int sourceLength = Math.min(title.length(), MAX_TITLE_LENGTH - COPY_SUFFIX.length());
+        return title.substring(0, sourceLength).stripTrailing() + COPY_SUFFIX;
     }
 }

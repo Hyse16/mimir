@@ -5,9 +5,13 @@ import { getBlogPosts, getSystemStatus } from "@/lib/mimir-api";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [systemStatus, blogPage] = await Promise.all([getSystemStatus(), getBlogPosts()]);
-  const recent = blogPage?.items.slice(0, 5) ?? [];
-  const archived = blogPage?.items.filter((post) => post.status === "ARCHIVED").length ?? 0;
+  const [systemStatus, blogPage, archivedPage] = await Promise.all([
+    getSystemStatus(),
+    getBlogPosts({ size: 5 }),
+    getBlogPosts({ status: "ARCHIVED", size: 1 }),
+  ]);
+  const recent = blogPage?.items ?? [];
+  const archived = archivedPage?.totalItems ?? 0;
 
   const summary = [
     { label: "전체 게시글", value: blogPage ? String(blogPage.totalItems) : "—", tone: "neutral" },
@@ -74,5 +78,12 @@ function formatDate(value: string) {
 }
 
 function statusLabel(status: string) {
-  return status === "ARCHIVED" ? "보관됨" : "작성 중";
+  return ({
+    DRAFT: "초안",
+    GENERATING: "생성 중",
+    REVIEW_REQUIRED: "검토 필요",
+    READY: "게시 준비",
+    PUBLISHED: "게시 완료",
+    ARCHIVED: "보관됨",
+  } as Record<string, string>)[status] ?? status;
 }

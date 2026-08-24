@@ -109,4 +109,30 @@ class BlogPostServiceIntegrationTest {
         assertThat(listed.items()).extracting(BlogApiModels.BlogPostSummaryResponse::id)
                 .contains(created.id());
     }
+
+    @Test
+    void duplicatesTheSelectedDraftAsAnIndependentPost() {
+        var created = service.create(new CreateBlogPostRequest(
+                "원본 기록",
+                "검증된 사실 메모",
+                "첫 번째 본문",
+                List.of("기록")));
+        var revised = service.addVersion(created.id(), new CreateDraftVersionRequest(
+                created.currentVersionId(),
+                "수정된 원본",
+                "현재 선택된 본문",
+                List.of("기록", "수정"),
+                DraftSource.USER_EDIT));
+
+        var duplicated = service.duplicate(created.id());
+
+        assertThat(duplicated.id()).isNotEqualTo(created.id());
+        assertThat(duplicated.title()).isEqualTo("수정된 원본 (복사본)");
+        assertThat(duplicated.status()).isEqualTo(BlogPostStatus.DRAFT);
+        assertThat(duplicated.visitContext()).isEqualTo("검증된 사실 메모");
+        assertThat(duplicated.currentVersion().versionNumber()).isEqualTo(1);
+        assertThat(duplicated.currentVersion().body()).isEqualTo(revised.currentVersion().body());
+        assertThat(duplicated.currentVersion().tags()).containsExactly("기록", "수정");
+        assertThat(duplicated.versions()).hasSize(1);
+    }
 }

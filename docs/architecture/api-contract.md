@@ -35,6 +35,7 @@ The `traceId` correlates non-sensitive logs. Prompts, browser cookies, OAuth tok
 | `GET` | `/api/v1/blog-posts/{postId}` | Read post detail, current version summary, and ordered assets |
 | `PATCH` | `/api/v1/blog-posts/{postId}` | Update editable metadata and lifecycle state |
 | `POST` | `/api/v1/blog-posts/{postId}/archive` | Archive without destructive deletion |
+| `POST` | `/api/v1/blog-posts/{postId}/duplicate` | Copy the selected draft and factual context into an independent draft post |
 | `POST` | `/api/v1/blog-posts/{postId}/assets` | Upload and append validated assets, enforcing the total limit of 20 |
 | `PUT` | `/api/v1/blog-posts/{postId}/assets/order` | Persist complete display order |
 | `POST` | `/api/v1/blog-posts/{postId}/versions` | Save a user edit or AI revision as an immutable version |

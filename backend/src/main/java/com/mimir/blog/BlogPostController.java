@@ -81,4 +81,10 @@ public class BlogPostController {
     public BlogPostDetailResponse archive(@PathVariable UUID postId) {
         return service.archive(postId);
     }
+
+    @PostMapping("/{postId}/duplicate")
+    public ResponseEntity<BlogPostDetailResponse> duplicate(@PathVariable UUID postId) {
+        BlogPostDetailResponse response = service.duplicate(postId);
+        return ResponseEntity.created(URI.create("/api/v1/blog-posts/" + response.id())).body(response);
+    }
 }
