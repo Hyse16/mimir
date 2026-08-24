@@ -4,7 +4,7 @@ Mimir is a local-first personal AI workspace. The project starts with an AI-assi
 
 ## Status
 
-The repository has completed **STEP 1: project skeleton** and is implementing **STEP 2: Blog CRUD**. Durable blog drafts, immutable versions, Flet editing, and backoffice search, review, editing, duplication, status, and archive operations are available. Image assets remain the open boundary between STEP 2 and the STEP 3 image pipeline.
+The repository has completed the executable skeleton and core **STEP 2: Blog CRUD** flow and has begun **STEP 3: Image Pipeline**. Durable drafts and editing are available alongside validated local image storage, the 20-image boundary, persistent ordering, deletion, and shared asset metadata.
 
 ## Planned architecture
 
@@ -33,6 +33,8 @@ The accepted application boundaries are recorded in [docs/architecture/applicati
 STEP 1 versions, run commands, verification, database impact, and known gaps are recorded in [docs/step-1-project-skeleton.md](docs/step-1-project-skeleton.md).
 
 Current STEP 2 delivery, verification, and remaining contract decisions are recorded in [docs/step-2-blog-crud.md](docs/step-2-blog-crud.md).
+
+Current STEP 3 storage, upload, and ordering behavior is recorded in [docs/step-3-image-pipeline.md](docs/step-3-image-pipeline.md).
 
 ## STEP 0 model probes
 

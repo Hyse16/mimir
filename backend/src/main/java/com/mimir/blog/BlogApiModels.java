@@ -55,6 +55,19 @@ final class BlogApiModels {
             boolean selected) {
     }
 
+    record BlogAssetResponse(
+            UUID id,
+            int displayOrder,
+            String originalFilename,
+            String contentType,
+            long byteSize,
+            Instant createdAt) {
+    }
+
+    record ReorderBlogAssetsRequest(
+            @NotNull @Size(max = 20) List<@NotNull UUID> assetIds) {
+    }
+
     record BlogPostDetailResponse(
             UUID id,
             String title,
@@ -64,7 +77,8 @@ final class BlogApiModels {
             Instant createdAt,
             Instant updatedAt,
             DraftVersionResponse currentVersion,
-            List<DraftVersionResponse> versions) {
+            List<DraftVersionResponse> versions,
+            List<BlogAssetResponse> assets) {
     }
 
     record PageResponse<T>(

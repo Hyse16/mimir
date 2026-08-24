@@ -70,6 +70,22 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
         </form>
       </section>
 
+      <section className="panel assetPanel">
+        <div className="panelHeader"><div><h2>이미지 자산</h2><p>원본 저장 순서와 검증된 파일 메타데이터입니다.</p></div><span className="countBadge">{post.assets.length} / 20</span></div>
+        {post.assets.length === 0 ? (
+          <div className="emptyState"><h3>등록된 이미지가 없습니다</h3><p>이미지 업로드 화면은 STEP 3의 다음 슬라이스에서 연결됩니다.</p></div>
+        ) : (
+          <ol className="assetList">
+            {post.assets.map((asset) => (
+              <li key={asset.id}>
+                <span className="assetOrder">{asset.displayOrder + 1}</span>
+                <span><strong>{asset.originalFilename}</strong><small>{asset.contentType} · {formatBytes(asset.byteSize)}</small></span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
       <section className="panel actionPanel">
         <div><h2>게시글 관리</h2><p>상태 변경, 복제, 보관은 본문 버전과 독립적으로 관리됩니다.</p></div>
         <div className="actionButtons">
@@ -118,4 +134,10 @@ function statusLabel(status: string) {
     PUBLISHED: "게시 완료",
     ARCHIVED: "보관됨",
   } as Record<string, string>)[status] ?? status;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

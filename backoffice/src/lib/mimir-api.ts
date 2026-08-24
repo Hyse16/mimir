@@ -26,10 +26,20 @@ export type DraftVersion = {
   selected: boolean;
 };
 
+export type BlogAsset = {
+  id: string;
+  displayOrder: number;
+  originalFilename: string;
+  contentType: string;
+  byteSize: number;
+  createdAt: string;
+};
+
 export type BlogPostDetail = BlogPostSummary & {
   visitContext: string;
   currentVersion: DraftVersion;
   versions: DraftVersion[];
+  assets: BlogAsset[];
 };
 
 export type BlogPostPage = {
@@ -126,6 +136,18 @@ function isDraftVersion(value: unknown): value is DraftVersion {
   );
 }
 
+function isBlogAsset(value: unknown): value is BlogAsset {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    typeof value.displayOrder === "number" &&
+    typeof value.originalFilename === "string" &&
+    typeof value.contentType === "string" &&
+    typeof value.byteSize === "number" &&
+    typeof value.createdAt === "string"
+  );
+}
+
 function isBlogPostPage(value: unknown): value is BlogPostPage {
   if (!isRecord(value)) return false;
   return (
@@ -145,7 +167,9 @@ function isBlogPostDetail(value: unknown): value is BlogPostDetail {
     typeof candidate.visitContext === "string" &&
     isDraftVersion(candidate.currentVersion) &&
     Array.isArray(candidate.versions) &&
-    candidate.versions.every(isDraftVersion)
+    candidate.versions.every(isDraftVersion) &&
+    Array.isArray(candidate.assets) &&
+    candidate.assets.every(isBlogAsset)
   );
 }
 

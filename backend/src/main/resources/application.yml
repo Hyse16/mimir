@@ -11,6 +11,15 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: 15MB
+      max-request-size: 305MB
+
+mimir:
+  storage:
+    local-root: ${MIMIR_STORAGE_LOCAL_ROOT:./data/assets}
+    max-image-bytes: ${MIMIR_MAX_IMAGE_BYTES:15728640}
 
 management:
   endpoints:

@@ -7,12 +7,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.UUID;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -24,6 +27,7 @@ import org.testcontainers.utility.DockerImageName;
 @Transactional
 class BlogPostServiceIntegrationTest {
 
+    private static final String ASSET_ROOT = System.getProperty("java.io.tmpdir") + "/mimir-assets-" + UUID.randomUUID();
     private static final DockerImageName PGVECTOR_IMAGE = DockerImageName
             .parse("pgvector/pgvector:0.8.6-pg17")
             .asCompatibleSubstituteFor("postgres");
@@ -39,10 +43,14 @@ class BlogPostServiceIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("mimir.storage.local-root", () -> ASSET_ROOT);
     }
 
     @Autowired
     private BlogPostService service;
+
+    @Autowired
+    private BlogAssetService assetService;
 
     @Test
     void preservesEveryDraftVersionAndCanSelectAnOlderVersion() {
@@ -156,5 +164,88 @@ class BlogPostServiceIntegrationTest {
         assertThat(ready.status()).isEqualTo(BlogPostStatus.READY);
         assertThat(ready.currentVersionId()).isEqualTo(created.currentVersionId());
         assertThat(ready.versions()).hasSize(1);
+    }
+
+    @Test
+    void supportsZeroOneThreeTenAndTwentyOrderedImages() {
+        for (int count : List.of(0, 1, 3, 10, 20)) {
+            var post = createPost("이미지 " + count + "장");
+
+            if (count > 0) {
+                assetService.upload(post.id(), images(count));
+            }
+
+            var assets = assetService.list(post.id());
+            assertThat(assets).hasSize(count);
+            assertThat(service.detail(post.id()).assets()).hasSize(count);
+            assertThat(assets).extracting(BlogApiModels.BlogAssetResponse::displayOrder)
+                    .containsExactlyElementsOf(IntStream.range(0, count).boxed().toList());
+        }
+    }
+
+    @Test
+    void rejectsTheTwentyFirstImageWithoutChangingStoredAssets() {
+        var post = createPost("최대 이미지");
+        assetService.upload(post.id(), images(20));
+
+        assertThatThrownBy(() -> assetService.upload(post.id(), images(1)))
+                .isInstanceOf(BlogAssetLimitExceededException.class);
+        assertThat(assetService.list(post.id())).hasSize(20);
+    }
+
+    @Test
+    void requiresACompleteUniqueAssetOrder() {
+        var post = createPost("순서 변경");
+        var uploaded = assetService.upload(post.id(), images(3));
+        var reversed = uploaded.reversed().stream().map(BlogApiModels.BlogAssetResponse::id).toList();
+
+        var reordered = assetService.reorder(post.id(), reversed);
+
+        assertThat(reordered).extracting(BlogApiModels.BlogAssetResponse::id)
+                .containsExactlyElementsOf(reversed);
+        assertThatThrownBy(() -> assetService.reorder(post.id(), List.of(reversed.getFirst(), reversed.getFirst())))
+                .isInstanceOf(InvalidBlogAssetException.class);
+    }
+
+    @Test
+    void deletesAnAssetAndCompactsTheRemainingOrder() {
+        var post = createPost("이미지 삭제");
+        var uploaded = assetService.upload(post.id(), images(3));
+
+        var remaining = assetService.delete(post.id(), uploaded.get(1).id());
+
+        assertThat(remaining).extracting(BlogApiModels.BlogAssetResponse::id)
+                .containsExactly(uploaded.getFirst().id(), uploaded.getLast().id());
+        assertThat(remaining).extracting(BlogApiModels.BlogAssetResponse::displayOrder)
+                .containsExactly(0, 1);
+    }
+
+    @Test
+    void sanitizesOriginalNamesAndRejectsSpoofedImageContent() {
+        var post = createPost("안전한 업로드");
+        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01};
+        var safe = new MockMultipartFile("files", "../../private/photo.png", "image/png", png);
+        var spoofed = new MockMultipartFile("files", "photo.png", "image/png", "not-an-image".getBytes());
+
+        assertThat(assetService.upload(post.id(), List.of(safe)).getFirst().originalFilename())
+                .isEqualTo("photo.png");
+        assertThatThrownBy(() -> assetService.upload(post.id(), List.of(spoofed)))
+                .isInstanceOf(InvalidBlogAssetException.class);
+        assertThat(assetService.list(post.id())).hasSize(1);
+    }
+
+    private BlogApiModels.BlogPostDetailResponse createPost(String title) {
+        return service.create(new CreateBlogPostRequest(title, "", "", List.of()));
+    }
+
+    private List<MockMultipartFile> images(int count) {
+        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01};
+        return IntStream.range(0, count)
+                .mapToObj(index -> new MockMultipartFile(
+                        "files",
+                        "image-" + index + ".png",
+                        "image/png",
+                        png))
+                .toList();
     }
 }

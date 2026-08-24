@@ -66,6 +66,7 @@ def blog_response(version_number: int = 1) -> Response:
                 "updatedAt": "2026-08-20T10:00:00Z",
                 "currentVersion": version,
                 "versions": [version],
+                "assets": [],
             }
         ).encode()
     )

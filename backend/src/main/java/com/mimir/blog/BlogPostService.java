@@ -33,24 +33,28 @@ public class BlogPostService {
     private final BlogPostRepository postRepository;
     private final BlogContextRepository contextRepository;
     private final BlogDraftVersionRepository versionRepository;
+    private final BlogAssetRepository assetRepository;
     private final Clock clock;
 
     @Autowired
     BlogPostService(
             BlogPostRepository postRepository,
             BlogContextRepository contextRepository,
-            BlogDraftVersionRepository versionRepository) {
-        this(postRepository, contextRepository, versionRepository, Clock.systemUTC());
+            BlogDraftVersionRepository versionRepository,
+            BlogAssetRepository assetRepository) {
+        this(postRepository, contextRepository, versionRepository, assetRepository, Clock.systemUTC());
     }
 
     BlogPostService(
             BlogPostRepository postRepository,
             BlogContextRepository contextRepository,
             BlogDraftVersionRepository versionRepository,
+            BlogAssetRepository assetRepository,
             Clock clock) {
         this.postRepository = postRepository;
         this.contextRepository = contextRepository;
         this.versionRepository = versionRepository;
+        this.assetRepository = assetRepository;
         this.clock = clock;
     }
 
@@ -130,6 +134,9 @@ public class BlogPostService {
                 currentVersion,
                 versions.stream()
                         .map(version -> versionResponse(version, version.getId().equals(post.getCurrentVersionId())))
+                        .toList(),
+                assetRepository.findByBlogPostIdOrderByDisplayOrderAsc(postId).stream()
+                        .map(BlogAssetService::toResponse)
                         .toList());
     }
 

@@ -88,4 +88,8 @@ class BlogPostEntity {
         this.status = BlogPostStatus.ARCHIVED;
         this.updatedAt = now;
     }
+
+    void touch(Instant now) {
+        this.updatedAt = now;
+    }
 }

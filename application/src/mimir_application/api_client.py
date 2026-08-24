@@ -35,6 +35,16 @@ class BlogPostSummary:
 
 
 @dataclass(frozen=True)
+class BlogAsset:
+    id: str
+    display_order: int
+    original_filename: str
+    content_type: str
+    byte_size: int
+    created_at: str
+
+
+@dataclass(frozen=True)
 class BlogPostDetail:
     id: str
     title: str
@@ -45,6 +55,7 @@ class BlogPostDetail:
     updated_at: str
     current_version: DraftVersion
     versions: tuple[DraftVersion, ...]
+    assets: tuple[BlogAsset, ...]
 
 
 class BackendUnavailableError(RuntimeError):
@@ -183,8 +194,9 @@ class MimirApiClient:
                 updated_at=str(payload["updatedAt"]),
                 current_version=cls._draft_version(payload["currentVersion"]),
                 versions=versions,
+                assets=tuple(cls._blog_asset(item) for item in payload["assets"]),
             )
-        except (KeyError, TypeError) as error:
+        except (KeyError, TypeError, ValueError) as error:
             raise BackendUnavailableError("Mimir backend returned an invalid blog post.") from error
 
     @staticmethod
@@ -198,6 +210,19 @@ class MimirApiClient:
             current_version_id=str(payload["currentVersionId"]),
             created_at=str(payload["createdAt"]),
             updated_at=str(payload["updatedAt"]),
+        )
+
+    @staticmethod
+    def _blog_asset(payload: Any) -> BlogAsset:
+        if not isinstance(payload, dict):
+            raise TypeError
+        return BlogAsset(
+            id=str(payload["id"]),
+            display_order=int(payload["displayOrder"]),
+            original_filename=str(payload["originalFilename"]),
+            content_type=str(payload["contentType"]),
+            byte_size=int(payload["byteSize"]),
+            created_at=str(payload["createdAt"]),
         )
 
     @staticmethod

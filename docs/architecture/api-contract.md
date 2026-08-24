@@ -46,6 +46,8 @@ The `traceId` correlates non-sensitive logs. Prompts, browser cookies, OAuth tok
 
 Destructive deletion is excluded from the first vertical slice. Archive is reversible and keeps version and job history coherent.
 
+Image uploads use multipart field `files`, allow JPEG, PNG, and WebP only, and enforce both declared-type/signature matching and the configured size limit. Ordering requests contain every current asset ID exactly once; partial or duplicate order lists are rejected.
+
 ## Revision request
 
 ```json
