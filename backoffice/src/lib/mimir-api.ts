@@ -71,6 +71,10 @@ export const BLOG_POST_STATUSES = [
 const baseUrl = () =>
   (process.env.MIMIR_API_BASE_URL ?? "http://127.0.0.1:8080/api/v1").replace(/\/$/, "");
 
+export function getMimirApiUrl(path: string) {
+  return `${baseUrl()}${path}`;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -188,7 +192,7 @@ async function getJson(path: string): Promise<unknown | null> {
 
 async function sendJson(
   path: string,
-  method: "POST" | "PATCH",
+  method: "POST" | "PATCH" | "PUT" | "DELETE",
   body?: Record<string, unknown>,
 ): Promise<unknown | null> {
   try {
@@ -257,4 +261,17 @@ export async function saveBlogVersion(
 export async function updateBlogPostStatus(id: string, status: string): Promise<BlogPostDetail | null> {
   const payload = await sendJson(`/blog-posts/${encodeURIComponent(id)}`, "PATCH", { status });
   return isBlogPostDetail(payload) ? payload : null;
+}
+
+export async function reorderBlogAssets(id: string, assetIds: string[]): Promise<BlogAsset[] | null> {
+  const payload = await sendJson(`/blog-posts/${encodeURIComponent(id)}/assets/order`, "PUT", { assetIds });
+  return Array.isArray(payload) && payload.every(isBlogAsset) ? payload : null;
+}
+
+export async function deleteBlogAsset(id: string, assetId: string): Promise<BlogAsset[] | null> {
+  const payload = await sendJson(
+    `/blog-posts/${encodeURIComponent(id)}/assets/${encodeURIComponent(assetId)}`,
+    "DELETE",
+  );
+  return Array.isArray(payload) && payload.every(isBlogAsset) ? payload : null;
 }

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from uuid import uuid4
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,13 @@ class BlogAsset:
     content_type: str
     byte_size: int
     created_at: str
+
+
+@dataclass(frozen=True)
+class ImageUpload:
+    filename: str
+    content_type: str
+    content: bytes
 
 
 @dataclass(frozen=True)
@@ -147,6 +155,42 @@ class MimirApiClient:
         )
         return self._blog_post_detail(payload)
 
+    def upload_blog_assets(
+        self,
+        post_id: str,
+        images: list[ImageUpload],
+    ) -> tuple[BlogAsset, ...]:
+        if not images:
+            raise ValueError("At least one image is required.")
+        boundary = f"mimir-{uuid4().hex}"
+        body = bytearray()
+        for image in images:
+            filename = self._multipart_filename(image.filename)
+            body.extend(f"--{boundary}\r\n".encode())
+            body.extend(
+                f'Content-Disposition: form-data; name="files"; filename="{filename}"\r\n'.encode("utf-8")
+            )
+            body.extend(f"Content-Type: {image.content_type}\r\n\r\n".encode())
+            body.extend(image.content)
+            body.extend(b"\r\n")
+        body.extend(f"--{boundary}--\r\n".encode())
+        payload = self._send_request(
+            "POST",
+            f"/blog-posts/{post_id}/assets",
+            bytes(body),
+            {
+                "Accept": "application/json",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+            },
+            timeout_seconds=max(self._timeout_seconds, 60.0),
+        )
+        if not isinstance(payload, list):
+            raise BackendUnavailableError("Mimir backend returned invalid image assets.")
+        try:
+            return tuple(self._blog_asset(item) for item in payload)
+        except (KeyError, TypeError, ValueError) as error:
+            raise BackendUnavailableError("Mimir backend returned invalid image assets.") from error
+
     def _request(
         self,
         method: str,
@@ -157,6 +201,17 @@ class MimirApiClient:
         headers = {"Accept": "application/json"}
         if data is not None:
             headers["Content-Type"] = "application/json"
+        return self._send_request(method, path, data, headers)
+
+    def _send_request(
+        self,
+        method: str,
+        path: str,
+        data: bytes | None,
+        headers: dict[str, str],
+        *,
+        timeout_seconds: float | None = None,
+    ) -> Any:
         request = Request(
             f"{self._base_url}{path}",
             headers=headers,
@@ -164,7 +219,7 @@ class MimirApiClient:
             method=method,
         )
         try:
-            with urlopen(request, timeout=self._timeout_seconds) as response:
+            with urlopen(request, timeout=timeout_seconds or self._timeout_seconds) as response:
                 return json.load(response)
         except HTTPError as error:
             message = "요청을 처리할 수 없습니다."
@@ -177,6 +232,10 @@ class MimirApiClient:
             raise ApiRequestError(message, error.code) from error
         except (URLError, TimeoutError, json.JSONDecodeError) as error:
             raise BackendUnavailableError("Mimir backend is unavailable.") from error
+
+    @staticmethod
+    def _multipart_filename(filename: str) -> str:
+        return filename.replace("\\", "_").replace('"', "_").replace("\r", "").replace("\n", "") or "image"
 
     @classmethod
     def _blog_post_detail(cls, payload: Any) -> BlogPostDetail:

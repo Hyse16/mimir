@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   archiveBlogPostAction,
+  deleteBlogAssetAction,
   duplicateBlogPostAction,
+  reorderBlogAssetsAction,
   saveBlogDraftAction,
   updateBlogStatusAction,
 } from "@/app/blogs/actions";
@@ -27,6 +29,8 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
   const duplicateAction = duplicateBlogPostAction.bind(null, post.id, returnTo);
   const saveAction = saveBlogDraftAction.bind(null, post.id, returnTo);
   const statusAction = updateBlogStatusAction.bind(null, post.id, returnTo);
+  const assetIds = post.assets.map((asset) => asset.id);
+  const uploadAction = `/api/blog-posts/${encodeURIComponent(post.id)}/assets?returnTo=${encodeURIComponent(returnTo)}`;
   const notice = single(query.notice);
   const error = single(query.error);
 
@@ -41,6 +45,9 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
       {notice === "duplicated" && <p className="noticeBanner" role="status">독립된 복사본을 만들었습니다.</p>}
       {notice === "saved" && <p className="noticeBanner" role="status">수정 내용을 새 버전으로 저장했습니다.</p>}
       {notice === "status" && <p className="noticeBanner" role="status">게시글 상태를 변경했습니다.</p>}
+      {notice === "asset-upload" && <p className="noticeBanner" role="status">이미지를 업로드했습니다.</p>}
+      {notice === "asset-order" && <p className="noticeBanner" role="status">이미지 순서를 변경했습니다.</p>}
+      {notice === "asset-delete" && <p className="noticeBanner" role="status">이미지를 삭제했습니다.</p>}
       {error && <p className="noticeBanner error" role="alert">요청을 처리하지 못했습니다. 백엔드 연결 상태를 확인해주세요.</p>}
 
       <section className="detailGrid">
@@ -72,14 +79,43 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
 
       <section className="panel assetPanel">
         <div className="panelHeader"><div><h2>이미지 자산</h2><p>원본 저장 순서와 검증된 파일 메타데이터입니다.</p></div><span className="countBadge">{post.assets.length} / 20</span></div>
+        <form action={uploadAction} className="assetUploadForm" encType="multipart/form-data" method="post">
+          <label>
+            <span>이미지 선택</span>
+            <input
+              accept="image/jpeg,image/png,image/webp"
+              disabled={post.assets.length >= 20}
+              multiple
+              name="files"
+              required
+              type="file"
+            />
+          </label>
+          <button className="primaryButton" disabled={post.assets.length >= 20} type="submit">업로드</button>
+        </form>
+        <p className="assetHint">JPEG, PNG, WebP · 이미지당 최대 15 MiB · 남은 수량 {20 - post.assets.length}장</p>
         {post.assets.length === 0 ? (
-          <div className="emptyState"><h3>등록된 이미지가 없습니다</h3><p>이미지 업로드 화면은 STEP 3의 다음 슬라이스에서 연결됩니다.</p></div>
+          <div className="emptyState"><h3>등록된 이미지가 없습니다</h3><p>위에서 이미지를 선택해 원본 자산을 추가하세요.</p></div>
         ) : (
           <ol className="assetList">
-            {post.assets.map((asset) => (
+            {post.assets.map((asset, index) => (
               <li key={asset.id}>
                 <span className="assetOrder">{asset.displayOrder + 1}</span>
-                <span><strong>{asset.originalFilename}</strong><small>{asset.contentType} · {formatBytes(asset.byteSize)}</small></span>
+                <span className="assetMetadata"><strong>{asset.originalFilename}</strong><small>{asset.contentType} · {formatBytes(asset.byteSize)}</small></span>
+                <div className="assetActions">
+                  <form action={reorderBlogAssetsAction.bind(null, post.id, returnTo, moveAsset(assetIds, index, -1))}>
+                    <button aria-label={`${asset.originalFilename} 위로 이동`} className="orderButton" disabled={index === 0} type="submit">↑</button>
+                  </form>
+                  <form action={reorderBlogAssetsAction.bind(null, post.id, returnTo, moveAsset(assetIds, index, 1))}>
+                    <button aria-label={`${asset.originalFilename} 아래로 이동`} className="orderButton" disabled={index === post.assets.length - 1} type="submit">↓</button>
+                  </form>
+                  <ConfirmActionForm
+                    action={deleteBlogAssetAction.bind(null, post.id, returnTo, asset.id)}
+                    label="삭제"
+                    message={`${asset.originalFilename} 이미지를 삭제할까요? 저장된 원본도 함께 제거됩니다.`}
+                    tone="danger"
+                  />
+                </div>
               </li>
             ))}
           </ol>
@@ -140,4 +176,12 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function moveAsset(assetIds: string[], index: number, offset: -1 | 1) {
+  const target = index + offset;
+  if (target < 0 || target >= assetIds.length) return assetIds;
+  const reordered = [...assetIds];
+  [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+  return reordered;
 }

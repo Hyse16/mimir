@@ -4,7 +4,7 @@ Last verified: 2026-08-24 (Asia/Seoul)
 
 ## Outcome
 
-Blog posts can persist up to 20 ordered image assets. PostgreSQL owns asset metadata and order, while original bytes pass through a provider-independent storage boundary backed by the local filesystem for development.
+Blog posts can persist and manage up to 20 ordered image assets from both workspaces. PostgreSQL owns asset metadata and order, while original bytes pass through a provider-independent storage boundary backed by the local filesystem for development.
 
 ## Delivered
 
@@ -15,7 +15,9 @@ Blog posts can persist up to 20 ordered image assets. PostgreSQL owns asset meta
 - Server-generated storage keys; user filenames are sanitized metadata and never filesystem paths
 - Transactional 20-image enforcement under a per-post database lock
 - Complete-order validation, persistent reordering, deletion, and order compaction
-- Ordered asset metadata in blog detail responses and the backoffice detail view
+- Flet multi-image selection and multipart upload with saved/selected image counts
+- Backoffice multipart upload streamed through a Route Handler, deletion confirmation, and accessible up/down ordering controls
+- Ordered asset metadata in blog detail responses and both client workspaces
 
 ## API
 
@@ -29,12 +31,10 @@ Defaults can be overridden with `MIMIR_STORAGE_LOCAL_ROOT` and `MIMIR_MAX_IMAGE_
 
 Backend integration tests use PostgreSQL/pgvector and temporary local storage. They cover 0, 1, 3, 10, and 20 images, rejection of image 21, MIME-signature mismatch, path-like filenames, complete ordering, deletion, and order compaction.
 
-The Python client tests and Next.js lint, typecheck, and production build verify that the extended blog detail response remains consumable across both clients.
+The Python client tests verify multipart framing and asset response parsing. The Flet construction smoke test and Next.js lint, typecheck, and production build verify that image operations remain consumable across both clients.
 
 ## Remaining STEP 3 work
 
-- Flet multi-image selection and upload progress
-- Backoffice upload, deletion, and drag/drop ordering controls
 - Original image decoding, resize, compression, and analysis-image derivatives
 - Dimension and derivative metadata
 - Structured per-image analysis, sequential vision batching, partial failure, and retry

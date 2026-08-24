@@ -5,10 +5,32 @@ import { redirect } from "next/navigation";
 import {
   archiveBlogPost,
   BLOG_POST_STATUSES,
+  deleteBlogAsset,
   duplicateBlogPost,
+  reorderBlogAssets,
   saveBlogVersion,
   updateBlogPostStatus,
 } from "@/lib/mimir-api";
+
+export async function reorderBlogAssetsAction(
+  postId: string,
+  returnTo: string,
+  assetIds: string[],
+) {
+  const assets = await reorderBlogAssets(postId, assetIds);
+  if (!assets) redirect(detailHref(postId, returnTo, "error=asset-order"));
+
+  revalidateBlog(postId);
+  redirect(detailHref(postId, returnTo, "notice=asset-order"));
+}
+
+export async function deleteBlogAssetAction(postId: string, returnTo: string, assetId: string) {
+  const assets = await deleteBlogAsset(postId, assetId);
+  if (!assets) redirect(detailHref(postId, returnTo, "error=asset-delete"));
+
+  revalidateBlog(postId);
+  redirect(detailHref(postId, returnTo, "notice=asset-delete"));
+}
 
 export async function saveBlogDraftAction(postId: string, returnTo: string, formData: FormData) {
   const title = text(formData, "title").trim();

@@ -542,6 +542,37 @@ h1 {
   align-items: center;
 }
 
+.assetUploadForm {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  margin-top: 18px;
+}
+
+.assetUploadForm label {
+  display: grid;
+  flex: 1;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.assetUploadForm input {
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.assetHint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .assetList {
   display: grid;
   margin: 0;
@@ -550,7 +581,8 @@ h1 {
 }
 
 .assetList li {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 13px 4px;
@@ -561,9 +593,16 @@ h1 {
   border-bottom: 0;
 }
 
-.assetList li > span:last-child {
+.assetMetadata {
   display: grid;
   gap: 4px;
+  min-width: 0;
+}
+
+.assetMetadata strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .assetList small {
@@ -581,6 +620,32 @@ h1 {
   color: #067647;
   font-size: 13px;
   font-weight: 800;
+}
+
+.assetActions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.orderButton {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.orderButton:disabled,
+.assetUploadForm button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .draftForm {
@@ -751,5 +816,19 @@ h1 {
     align-items: stretch;
     flex-direction: column;
     width: 100%;
+  }
+
+  .assetUploadForm {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .assetList li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .assetActions {
+    grid-column: 2;
+    flex-wrap: wrap;
   }
 }

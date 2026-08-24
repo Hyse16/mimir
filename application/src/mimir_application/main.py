@@ -1,9 +1,12 @@
+import mimetypes
+
 import flet as ft
 
 from mimir_application.api_client import (
     ApiRequestError,
     BackendUnavailableError,
     BlogPostDetail,
+    ImageUpload,
     MimirApiClient,
 )
 from mimir_application.config import AppConfig
@@ -13,11 +16,13 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
     settings = config or AppConfig.from_environment()
     client = MimirApiClient(settings.api_base_url)
     current_post: BlogPostDetail | None = None
+    selected_images: list[ImageUpload] = []
 
     page.title = "Mimir"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
     page.bgcolor = "#F4F6F8"
+    file_picker = ft.FilePicker()
 
     status_text = ft.Text("연결 확인 전", color="#5B6470", key="backend-status")
     status_icon = ft.Icon(ft.Icons.CIRCLE_OUTLINED, color="#6B7280", size=14)
@@ -51,7 +56,9 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
     )
     selector_text = ft.Text("새 초안을 작성하거나 기존 게시글을 불러올 수 있습니다.", color="#5B6470")
     result_text = ft.Text("아직 저장된 초안이 없습니다.", color="#5B6470")
+    asset_text = ft.Text("게시글을 저장한 뒤 이미지를 최대 20장까지 추가할 수 있습니다.", color="#5B6470")
     save_button = ft.FilledButton("첫 초안 저장", icon=ft.Icons.SAVE_OUTLINED)
+    upload_button = ft.FilledButton("선택 이미지 업로드", icon=ft.Icons.UPLOAD, disabled=True)
 
     def refresh_status(_: ft.ControlEvent | None = None) -> None:
         try:
@@ -83,6 +90,10 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         selector_text.color = "#16803C"
         result_text.value = "기존 초안을 불러왔습니다. 저장하면 새 버전으로 보관됩니다."
         result_text.color = "#5B6470"
+        selected_images.clear()
+        upload_button.disabled = True
+        asset_text.value = f"저장된 이미지 {len(post.assets)} / 20장"
+        asset_text.color = "#5B6470"
 
     def refresh_posts(_: ft.ControlEvent | None = None) -> None:
         try:
@@ -128,7 +139,77 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         selector_text.color = "#5B6470"
         result_text.value = "아직 저장된 초안이 없습니다."
         result_text.color = "#5B6470"
+        selected_images.clear()
+        upload_button.disabled = True
+        asset_text.value = "게시글을 저장한 뒤 이미지를 최대 20장까지 추가할 수 있습니다."
+        asset_text.color = "#5B6470"
         page.update()
+
+    async def pick_images(_: ft.ControlEvent) -> None:
+        if current_post is None:
+            asset_text.value = "이미지를 추가하기 전에 게시글을 먼저 저장해주세요."
+            asset_text.color = "#B42318"
+            page.update()
+            return
+        remaining = 20 - len(current_post.assets)
+        if remaining <= 0:
+            asset_text.value = "이미지는 게시글당 최대 20장까지 저장할 수 있습니다."
+            asset_text.color = "#B42318"
+            page.update()
+            return
+        files = await file_picker.pick_files(
+            dialog_title="블로그 이미지 선택",
+            file_type=ft.FilePickerFileType.IMAGE,
+            allow_multiple=True,
+            with_data=True,
+        )
+        if not files:
+            return
+        if len(files) > remaining:
+            asset_text.value = f"현재 {remaining}장만 더 추가할 수 있습니다."
+            asset_text.color = "#B42318"
+            page.update()
+            return
+
+        uploads: list[ImageUpload] = []
+        for file in files:
+            content_type = mimetypes.guess_type(file.name)[0]
+            if file.bytes is None or content_type not in {"image/jpeg", "image/png", "image/webp"}:
+                asset_text.value = "JPEG, PNG, WebP 파일만 선택할 수 있습니다."
+                asset_text.color = "#B42318"
+                page.update()
+                return
+            uploads.append(ImageUpload(file.name, content_type, file.bytes))
+        selected_images[:] = uploads
+        upload_button.disabled = False
+        asset_text.value = f"{len(uploads)}장 선택됨 · 업로드 후 총 {len(current_post.assets) + len(uploads)}장"
+        asset_text.color = "#16803C"
+        page.update()
+
+    def upload_images(_: ft.ControlEvent) -> None:
+        nonlocal current_post
+        if current_post is None or not selected_images:
+            return
+        upload_button.disabled = True
+        asset_text.value = "원본 이미지 업로드 중…"
+        asset_text.color = "#5B6470"
+        page.update()
+        try:
+            client.upload_blog_assets(current_post.id, selected_images)
+            show_post(client.get_blog_post(current_post.id))
+            asset_text.value = f"업로드 완료 · 저장된 이미지 {len(current_post.assets)} / 20장"
+            asset_text.color = "#16803C"
+        except ApiRequestError as error:
+            asset_text.value = f"이미지 업로드 실패: {error}"
+            asset_text.color = "#B42318"
+        except BackendUnavailableError:
+            asset_text.value = "이미지 업로드 실패: 업무 서버에 연결할 수 없습니다."
+            asset_text.color = "#B42318"
+        finally:
+            upload_button.disabled = not selected_images
+            page.update()
+
+    upload_button.on_click = upload_images
 
     def save_draft(_: ft.ControlEvent) -> None:
         nonlocal current_post
@@ -151,6 +232,8 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                     body=body_field.value or "",
                     tags=parse_tags(),
                 )
+                asset_text.value = "게시글이 저장되었습니다. 이제 이미지를 선택할 수 있습니다."
+                asset_text.color = "#16803C"
             else:
                 current_post = client.add_blog_version(
                     current_post.id,
@@ -262,6 +345,26 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                             ),
                             ft.Divider(height=24, color="#E4E7EC"),
                             result_text,
+                        ]
+                    ),
+                ),
+                ft.Container(height=12),
+                ft.Container(
+                    bgcolor="#FFFFFF",
+                    border_radius=16,
+                    padding=24,
+                    content=ft.Column(
+                        controls=[
+                            ft.Text("이미지", size=18, weight=ft.FontWeight.W_600),
+                            ft.Text("JPEG, PNG, WebP · 이미지당 최대 15 MiB · 게시글당 최대 20장", color="#5B6470"),
+                            asset_text,
+                            ft.Row(
+                                alignment=ft.MainAxisAlignment.END,
+                                controls=[
+                                    ft.OutlinedButton("이미지 선택", icon=ft.Icons.IMAGE_OUTLINED, on_click=pick_images),
+                                    upload_button,
+                                ],
+                            ),
                         ]
                     ),
                 ),

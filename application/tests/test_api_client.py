@@ -5,7 +5,7 @@ from urllib.error import HTTPError
 
 import pytest
 
-from mimir_application.api_client import ApiRequestError, BackendUnavailableError, MimirApiClient
+from mimir_application.api_client import ApiRequestError, BackendUnavailableError, ImageUpload, MimirApiClient
 
 
 class Response(io.BytesIO):
@@ -126,6 +126,28 @@ def test_reads_existing_blog_post() -> None:
 
     assert request.call_args.args[0].full_url.endswith("/blog-posts/post-1")
     assert post.visit_context == "오후에 한강을 걸었다."
+
+
+def test_uploads_images_as_multipart_assets() -> None:
+    response = Response(json.dumps([{
+        "id": "asset-1",
+        "displayOrder": 0,
+        "originalFilename": "cafe.png",
+        "contentType": "image/png",
+        "byteSize": 9,
+        "createdAt": "2026-08-24T10:00:00Z",
+    }]).encode())
+    image = ImageUpload("cafe.png", "image/png", b"\x89PNG\r\n\x1a\n\x01")
+
+    with patch("mimir_application.api_client.urlopen", return_value=response) as request:
+        assets = MimirApiClient("http://localhost:8080/api/v1").upload_blog_assets("post-1", [image])
+
+    sent = request.call_args.args[0]
+    assert sent.full_url.endswith("/blog-posts/post-1/assets")
+    assert sent.get_header("Content-type").startswith("multipart/form-data; boundary=")
+    assert b'name="files"; filename="cafe.png"' in sent.data
+    assert image.content in sent.data
+    assert assets[0].original_filename == "cafe.png"
 
 
 def test_surfaces_backend_validation_message() -> None:
