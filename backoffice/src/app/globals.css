@@ -74,6 +74,11 @@ a {
   outline: none;
 }
 
+.navItem.disabled {
+  color: #667085;
+  cursor: not-allowed;
+}
+
 .privacyBadge,
 .connection {
   display: flex;
@@ -164,9 +169,14 @@ h1 {
 }
 
 .summaryCard p,
-.summaryCard span {
+.summaryCard span,
+.summaryCard a {
   color: var(--muted);
   font-size: 13px;
+}
+
+.summaryCard a {
+  text-decoration: none;
 }
 
 .summaryCard strong {
@@ -210,6 +220,17 @@ h1 {
   background: #f9fafb;
 }
 
+.secondaryButton,
+.countBadge {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f9fafb;
+  color: var(--ink);
+  font-size: 14px;
+  text-decoration: none;
+}
+
 .emptyState {
   padding: 56px 20px;
   text-align: center;
@@ -223,6 +244,205 @@ h1 {
 
 .emptyState h3 {
   margin-bottom: 8px;
+}
+
+.compactList {
+  display: grid;
+}
+
+.compactList > a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 4px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.compactList > a:last-child {
+  border-bottom: 0;
+}
+
+.compactList > a > span:first-child,
+.postRow > span:first-child {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.compactList small,
+.postRow small,
+.versionList small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.statusBadge,
+.selectedBadge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #ecfdf3;
+  color: #067647;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.statusBadge.archived {
+  background: #f2f4f7;
+  color: #475467;
+}
+
+.listPanel {
+  margin-top: 30px;
+  overflow: hidden;
+}
+
+.postTable {
+  display: grid;
+}
+
+.postRow {
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) 100px 180px 100px;
+  gap: 20px;
+  align-items: center;
+  padding: 17px 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.postRow:last-child {
+  border-bottom: 0;
+}
+
+.postRow.header {
+  padding-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.postRow a,
+.backLink {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: 22px;
+  font-size: 14px;
+}
+
+.detailHeader {
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 20px;
+}
+
+.currentDraft h3 {
+  margin: 24px 0 12px;
+}
+
+.draftBody {
+  min-height: 220px;
+  padding: 18px;
+  border-radius: 10px;
+  background: #f9fafb;
+  color: #344054;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.tagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 16px;
+}
+
+.tagList span {
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.contextPanel h2 {
+  font-size: 19px;
+}
+
+.contextPanel > p {
+  min-height: 100px;
+  color: #475467;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.contextPanel dl {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0 0;
+}
+
+.contextPanel dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.contextPanel dt {
+  color: var(--muted);
+}
+
+.contextPanel dd {
+  margin: 0;
+  text-align: right;
+}
+
+.historyPanel {
+  margin-top: 20px;
+}
+
+.versionList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.versionList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 17px 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.versionList li:last-child {
+  border-bottom: 0;
+}
+
+.versionList li > div {
+  display: grid;
+  gap: 5px;
+}
+
+.selectedBadge {
+  background: #eff8ff;
+  color: #175cd3;
 }
 
 @media (max-width: 900px) {
@@ -255,6 +475,15 @@ h1 {
   .summaryGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .postRow {
+    grid-template-columns: minmax(200px, 2fr) 90px 150px 90px;
+    gap: 12px;
+  }
+
+  .detailGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 580px) {
@@ -264,5 +493,14 @@ h1 {
 
   .summaryGrid {
     grid-template-columns: 1fr;
+  }
+
+  .postRow {
+    grid-template-columns: 1fr auto;
+  }
+
+  .postRow > span:nth-child(3),
+  .postRow.header {
+    display: none;
   }
 }

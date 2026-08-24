@@ -1,12 +1,18 @@
 import flet as ft
 
-from mimir_application.api_client import BackendUnavailableError, MimirApiClient
+from mimir_application.api_client import (
+    ApiRequestError,
+    BackendUnavailableError,
+    BlogPostDetail,
+    MimirApiClient,
+)
 from mimir_application.config import AppConfig
 
 
 def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
     settings = config or AppConfig.from_environment()
     client = MimirApiClient(settings.api_base_url)
+    current_post: BlogPostDetail | None = None
 
     page.title = "Mimir"
     page.theme_mode = ft.ThemeMode.LIGHT
@@ -15,15 +21,37 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
 
     status_text = ft.Text("연결 확인 전", color="#5B6470", key="backend-status")
     status_icon = ft.Icon(ft.Icons.CIRCLE_OUTLINED, color="#6B7280", size=14)
+    title_field = ft.TextField(label="제목", max_length=200, key="blog-title")
+    context_field = ft.TextField(
+        label="사실 메모",
+        hint_text="방문 날짜, 장소, 주문한 메뉴처럼 글에 반드시 반영할 사실만 적어주세요.",
+        multiline=True,
+        min_lines=2,
+        max_lines=4,
+        key="blog-context",
+    )
+    body_field = ft.TextField(
+        label="초안 본문",
+        hint_text="직접 작성하거나 다음 STEP의 로컬 AI가 만든 초안을 검토합니다.",
+        multiline=True,
+        min_lines=8,
+        max_lines=14,
+        key="blog-body",
+    )
+    tags_field = ft.TextField(
+        label="태그",
+        hint_text="쉼표로 구분 (예: 서울, 카페, 산책)",
+        key="blog-tags",
+    )
+    result_text = ft.Text("아직 저장된 초안이 없습니다.", color="#5B6470")
+    save_button = ft.FilledButton("첫 초안 저장", icon=ft.Icons.SAVE_OUTLINED)
 
     def refresh_status(_: ft.ControlEvent | None = None) -> None:
         try:
             status = client.get_system_status()
             status_icon.name = ft.Icons.CHECK_CIRCLE
             status_icon.color = "#16803C"
-            status_text.value = (
-                f"서버 {status.status} · DB {status.database} · {status.privacy_mode}"
-            )
+            status_text.value = f"서버 {status.status} · DB {status.database} · {status.privacy_mode}"
             status_text.color = "#16803C"
         except BackendUnavailableError:
             status_icon.name = ft.Icons.ERROR_OUTLINE
@@ -31,6 +59,57 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
             status_text.value = "업무 서버에 연결할 수 없습니다"
             status_text.color = "#B42318"
         page.update()
+
+    def parse_tags() -> list[str]:
+        return [tag.strip() for tag in (tags_field.value or "").split(",") if tag.strip()]
+
+    def save_draft(_: ft.ControlEvent) -> None:
+        nonlocal current_post
+        title = (title_field.value or "").strip()
+        if not title:
+            title_field.error_text = "제목을 입력해주세요."
+            page.update()
+            return
+
+        title_field.error_text = None
+        save_button.disabled = True
+        result_text.value = "저장 중…"
+        result_text.color = "#5B6470"
+        page.update()
+        try:
+            if current_post is None:
+                current_post = client.create_blog_post(
+                    title=title,
+                    visit_context=context_field.value or "",
+                    body=body_field.value or "",
+                    tags=parse_tags(),
+                )
+            else:
+                current_post = client.add_blog_version(
+                    current_post.id,
+                    base_version_id=current_post.current_version_id,
+                    title=title,
+                    body=body_field.value or "",
+                    tags=parse_tags(),
+                )
+            version = current_post.current_version
+            result_text.value = (
+                f"저장 완료 · 버전 {version.version_number} · {current_post.status} · "
+                f"백오피스에서 상세 이력을 확인할 수 있습니다."
+            )
+            result_text.color = "#16803C"
+            save_button.text = "새 버전 저장"
+        except ApiRequestError as error:
+            result_text.value = f"저장 실패: {error}"
+            result_text.color = "#B42318"
+        except BackendUnavailableError:
+            result_text.value = "저장 실패: 업무 서버에 연결할 수 없습니다."
+            result_text.color = "#B42318"
+        finally:
+            save_button.disabled = False
+            page.update()
+
+    save_button.on_click = save_draft
 
     sidebar = ft.Container(
         width=236,
@@ -42,18 +121,14 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                 ft.Text("Personal AI Workspace", size=12, color="#9CA3AF"),
                 ft.Divider(height=32, color="#374151"),
                 ft.ListTile(
-                    leading=ft.Icon(ft.Icons.AUTO_AWESOME, color="#A7F3D0"),
-                    title=ft.Text("비서", color="#FFFFFF"),
+                    leading=ft.Icon(ft.Icons.ARTICLE_OUTLINED, color="#A7F3D0"),
+                    title=ft.Text("블로그 작성", color="#FFFFFF"),
                     selected=True,
                     selected_tile_color="#1F2937",
                 ),
                 ft.ListTile(
-                    leading=ft.Icon(ft.Icons.ARTICLE_OUTLINED, color="#D1D5DB"),
-                    title=ft.Text("블로그", color="#D1D5DB"),
-                ),
-                ft.ListTile(
                     leading=ft.Icon(ft.Icons.CALENDAR_MONTH_OUTLINED, color="#D1D5DB"),
-                    title=ft.Text("일정", color="#D1D5DB"),
+                    title=ft.Text("일정 (예정)", color="#D1D5DB"),
                 ),
             ],
             expand=True,
@@ -64,6 +139,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         expand=True,
         padding=ft.Padding.all(32),
         content=ft.Column(
+            scroll=ft.ScrollMode.AUTO,
             controls=[
                 ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -71,9 +147,9 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                         ft.Column(
                             spacing=4,
                             controls=[
-                                ft.Text("무엇을 도와드릴까요?", size=28, weight=ft.FontWeight.BOLD),
+                                ft.Text("블로그 초안 작성", size=28, weight=ft.FontWeight.BOLD),
                                 ft.Text(
-                                    "블로그 글 생성과 실제 작업은 이 애플리케이션에서 진행합니다.",
+                                    "실제 작성과 수정은 여기서 진행하고, 전체 이력은 웹 백오피스에서 봅니다.",
                                     color="#5B6470",
                                 ),
                             ],
@@ -93,31 +169,27 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                     padding=24,
                     content=ft.Column(
                         controls=[
-                            ft.Text("빠른 시작", size=18, weight=ft.FontWeight.W_600),
-                            ft.TextField(
-                                hint_text="예: 이 사진들로 네이버 블로그 글을 작성해줘",
-                                multiline=True,
-                                min_lines=3,
-                                max_lines=6,
-                                key="assistant-input",
+                            ft.Text("작성 내용", size=18, weight=ft.FontWeight.W_600),
+                            ft.Text(
+                                "저장할 때마다 이전 내용을 덮어쓰지 않고 새 버전으로 보관합니다.",
+                                color="#5B6470",
                             ),
+                            title_field,
+                            context_field,
+                            body_field,
+                            tags_field,
                             ft.Row(
                                 alignment=ft.MainAxisAlignment.END,
-                                controls=[
-                                    ft.FilledButton(
-                                        "요청 시작",
-                                        icon=ft.Icons.ARROW_FORWARD,
-                                        disabled=True,
-                                        tooltip="블로그 흐름은 STEP 2에서 연결됩니다.",
-                                    )
-                                ],
+                                controls=[save_button],
                             ),
+                            ft.Divider(height=24, color="#E4E7EC"),
+                            result_text,
                         ]
                     ),
                 ),
                 ft.Container(height=12),
                 ft.Row(spacing=8, controls=[status_icon, status_text]),
-            ]
+            ],
         ),
     )
 

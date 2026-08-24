@@ -1,82 +1,78 @@
-import { getSystemStatus } from "@/lib/mimir-api";
+import Link from "next/link";
+import { AppShell } from "@/components/app-shell";
+import { getBlogPosts, getSystemStatus } from "@/lib/mimir-api";
 
 export const dynamic = "force-dynamic";
 
-const navigation = ["대시보드", "블로그", "AI 작업", "일정", "연동 상태"];
-
-const summary = [
-  { label: "전체 게시글", value: "0", tone: "neutral" },
-  { label: "검토 필요", value: "0", tone: "warning" },
-  { label: "실행 중 작업", value: "0", tone: "active" },
-  { label: "실패한 작업", value: "0", tone: "danger" },
-];
-
 export default async function Home() {
-  const systemStatus = await getSystemStatus();
+  const [systemStatus, blogPage] = await Promise.all([getSystemStatus(), getBlogPosts()]);
+  const recent = blogPage?.items.slice(0, 5) ?? [];
+  const archived = blogPage?.items.filter((post) => post.status === "ARCHIVED").length ?? 0;
+
+  const summary = [
+    { label: "전체 게시글", value: blogPage ? String(blogPage.totalItems) : "—", tone: "neutral" },
+    { label: "작성 중", value: blogPage ? String(blogPage.totalItems - archived) : "—", tone: "warning" },
+    { label: "보관됨", value: blogPage ? String(archived) : "—", tone: "active" },
+    { label: "서버 상태", value: systemStatus ? "정상" : "대기", tone: systemStatus ? "neutral" : "danger" },
+  ];
 
   return (
-    <main className="shell">
-      <aside className="sidebar">
+    <AppShell active="대시보드">
+      <header className="pageHeader">
         <div>
-          <p className="brand">MIMIR</p>
-          <p className="brandCaption">Operations</p>
+          <p className="eyebrow">OVERVIEW</p>
+          <h1>운영 대시보드</h1>
+          <p>애플리케이션에서 실행된 작업과 저장된 결과를 관리합니다.</p>
         </div>
-        <nav aria-label="주요 메뉴">
-          {navigation.map((item, index) => (
-            <a className={index === 0 ? "navItem active" : "navItem"} href="#" key={item}>
-              {item}
-            </a>
-          ))}
-        </nav>
-        <div className="privacyBadge">
-          <span aria-hidden="true" className="statusDot" />
-          Local Only
+        <div className="connection" role="status">
+          <span aria-hidden="true" className={systemStatus ? "statusDot" : "statusDot muted"} />
+          {systemStatus
+            ? `서버 ${systemStatus.status} · DB ${systemStatus.components.database}`
+            : "서버 연결 대기"}
         </div>
-      </aside>
+      </header>
 
-      <section className="content">
-        <header className="pageHeader">
-          <div>
-            <p className="eyebrow">OVERVIEW</p>
-            <h1>운영 대시보드</h1>
-            <p>애플리케이션에서 실행된 작업과 저장된 결과를 관리합니다.</p>
-          </div>
-          <div className="connection" role="status">
-            <span
-              aria-hidden="true"
-              className={systemStatus ? "statusDot" : "statusDot muted"}
-            />
-            {systemStatus
-              ? `서버 ${systemStatus.status} · DB ${systemStatus.components.database}`
-              : "서버 연결 대기"}
-          </div>
-        </header>
-
-        <section aria-label="업무 요약" className="summaryGrid">
-          {summary.map((item) => (
-            <article className={`summaryCard ${item.tone}`} key={item.label}>
-              <p>{item.label}</p>
-              <strong>{item.value}</strong>
-              <span>목록 보기 →</span>
-            </article>
-          ))}
-        </section>
-
-        <section className="panel">
-          <div className="panelHeader">
-            <div>
-              <h2>최근 활동</h2>
-              <p>아직 실행된 작업이 없습니다.</p>
-            </div>
-            <button disabled type="button">전체 보기</button>
-          </div>
-          <div className="emptyState">
-            <div aria-hidden="true" className="emptyIcon">◎</div>
-            <h3>표시할 활동이 없습니다</h3>
-            <p>Flet 애플리케이션에서 블로그 작업을 시작하면 여기에 기록됩니다.</p>
-          </div>
-        </section>
+      <section aria-label="업무 요약" className="summaryGrid">
+        {summary.map((item) => (
+          <article className={`summaryCard ${item.tone}`} key={item.label}>
+            <p>{item.label}</p>
+            <strong>{item.value}</strong>
+            <Link href="/blogs">목록 보기 →</Link>
+          </article>
+        ))}
       </section>
-    </main>
+
+      <section className="panel">
+        <div className="panelHeader">
+          <div>
+            <h2>최근 블로그</h2>
+            <p>최근 수정된 게시글을 최대 5개 표시합니다.</p>
+          </div>
+          <Link className="secondaryButton" href="/blogs">전체 보기</Link>
+        </div>
+        {blogPage === null ? (
+          <div className="emptyState"><h3>서버에 연결할 수 없습니다</h3><p>백엔드 실행 상태를 확인해주세요.</p></div>
+        ) : recent.length === 0 ? (
+          <div className="emptyState"><div aria-hidden="true" className="emptyIcon">◎</div><h3>표시할 게시글이 없습니다</h3><p>Flet 애플리케이션에서 첫 초안을 저장해보세요.</p></div>
+        ) : (
+          <div className="compactList">
+            {recent.map((post) => (
+              <Link href={`/blogs/${post.id}`} key={post.id}>
+                <span><strong>{post.title}</strong><small>{formatDate(post.updatedAt)}</small></span>
+                <span className={`statusBadge ${post.status.toLowerCase()}`}>{statusLabel(post.status)}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+    </AppShell>
   );
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Seoul" }).format(new Date(value));
+}
+
+function statusLabel(status: string) {
+  return status === "ARCHIVED" ? "보관됨" : "작성 중";
 }
