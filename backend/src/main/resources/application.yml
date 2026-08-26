@@ -33,6 +33,7 @@ mimir:
     ollama:
       base-url: ${MIMIR_OLLAMA_BASE_URL:http://127.0.0.1:11434}
       vision-model: ${MIMIR_OLLAMA_VISION_MODEL:gemma4:latest}
+      text-model: ${MIMIR_OLLAMA_TEXT_MODEL:qwen2.5:7b}
 
 management:
   endpoints:

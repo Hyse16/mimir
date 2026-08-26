@@ -4,7 +4,7 @@ Mimir is a local-first personal AI workspace. The project starts with an AI-assi
 
 ## Status
 
-The repository has completed the executable skeleton and core **STEP 2: Blog CRUD** flow and is implementing **STEP 3: Image Pipeline**. Durable drafts and editing are available alongside validated local image storage, ordered derivatives, structured local Vision analysis, resumable SSE progress, partial-failure retry, and cooperative cancellation.
+The repository has completed the executable skeleton and core **STEP 2: Blog CRUD** flow, delivered the main **STEP 3: Image Pipeline**, and begun **STEP 4: Local AI Revision Loop**. Durable drafts and editing are available alongside validated local image storage, ordered derivatives, structured local Vision analysis, resumable SSE progress, provider-independent text generation, and pre-persistence grounding checks.
 
 ## Planned architecture
 
@@ -35,6 +35,8 @@ STEP 1 versions, run commands, verification, database impact, and known gaps are
 Current STEP 2 delivery, verification, and remaining contract decisions are recorded in [docs/step-2-blog-crud.md](docs/step-2-blog-crud.md).
 
 Current STEP 3 storage, upload, and ordering behavior is recorded in [docs/step-3-image-pipeline.md](docs/step-3-image-pipeline.md).
+
+Current STEP 4 text generation and grounding behavior is recorded in [docs/step-4-local-ai-revision.md](docs/step-4-local-ai-revision.md).
 
 ## STEP 0 model probes
 
