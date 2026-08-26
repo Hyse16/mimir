@@ -56,6 +56,9 @@ class AiJobEntity {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @Column(name = "cancel_requested_at")
+    private Instant cancelRequestedAt;
+
     protected AiJobEntity() {
     }
 
@@ -77,6 +80,17 @@ class AiJobEntity {
         status = AiJobStatus.RUNNING;
         stage = AiJobStage.IMAGE_ANALYSIS;
         startedAt = now;
+    }
+
+    void requestCancellation(Instant now) {
+        status = AiJobStatus.CANCEL_REQUESTED;
+        cancelRequestedAt = now;
+    }
+
+    void cancel(Instant now) {
+        status = AiJobStatus.CANCELLED;
+        stage = AiJobStage.COMPLETE;
+        completedAt = now;
     }
 
     void recordBatch(int succeeded, int failed, Instant now) {
@@ -143,5 +157,9 @@ class AiJobEntity {
 
     Instant getCompletedAt() {
         return completedAt;
+    }
+
+    Instant getCancelRequestedAt() {
+        return cancelRequestedAt;
     }
 }

@@ -41,12 +41,21 @@ class ImageAnalysisJobRunner {
     void run(UUID jobId) {
         boolean started = false;
         try {
-            service.start(jobId);
+            if (!service.start(jobId)) {
+                return;
+            }
             started = true;
             List<ImageAnalysisJobService.AnalysisWorkItem> items = service.pendingItems(jobId);
             for (int start = 0; start < items.size(); start += batchSize) {
+                if (service.cancellationRequested(jobId)) {
+                    service.cancelRemaining(jobId);
+                    return;
+                }
                 int end = Math.min(items.size(), start + batchSize);
                 analyzeBatch(jobId, items.subList(start, end));
+            }
+            if (service.cancellationRequested(jobId)) {
+                service.cancelRemaining(jobId);
             }
         } catch (RuntimeException error) {
             if (started) {

@@ -1,6 +1,7 @@
 package com.mimir.blog;
 
 import static com.mimir.blog.ImageAnalysisApiModels.AiJobResponse;
+import static com.mimir.blog.ImageAnalysisApiModels.AiJobProgressEventResponse;
 import static com.mimir.blog.ImageAnalysisApiModels.ImageAnalysisItemResponse;
 import static com.mimir.blog.ImageAnalysisApiModels.ImageAnalysisResponse;
 
@@ -27,6 +28,7 @@ class ImageAnalysisJobService {
     private final AiJobRepository jobRepository;
     private final ImageAnalysisJobItemRepository itemRepository;
     private final BlogImageAnalysisRepository analysisRepository;
+    private final AiJobEventRepository eventRepository;
     private final Clock clock;
 
     @Autowired
@@ -35,8 +37,10 @@ class ImageAnalysisJobService {
             BlogAssetRepository assetRepository,
             AiJobRepository jobRepository,
             ImageAnalysisJobItemRepository itemRepository,
-            BlogImageAnalysisRepository analysisRepository) {
-        this(postRepository, assetRepository, jobRepository, itemRepository, analysisRepository, Clock.systemUTC());
+            BlogImageAnalysisRepository analysisRepository,
+            AiJobEventRepository eventRepository) {
+        this(postRepository, assetRepository, jobRepository, itemRepository, analysisRepository, eventRepository,
+                Clock.systemUTC());
     }
 
     ImageAnalysisJobService(
@@ -45,12 +49,14 @@ class ImageAnalysisJobService {
             AiJobRepository jobRepository,
             ImageAnalysisJobItemRepository itemRepository,
             BlogImageAnalysisRepository analysisRepository,
+            AiJobEventRepository eventRepository,
             Clock clock) {
         this.postRepository = postRepository;
         this.assetRepository = assetRepository;
         this.jobRepository = jobRepository;
         this.itemRepository = itemRepository;
         this.analysisRepository = analysisRepository;
+        this.eventRepository = eventRepository;
         this.clock = clock;
     }
 
@@ -88,12 +94,18 @@ class ImageAnalysisJobService {
     }
 
     @Transactional
-    public void start(UUID jobId) {
-        AiJobEntity job = requiredJob(jobId);
+    public boolean start(UUID jobId) {
+        AiJobEntity job = requiredJobForUpdate(jobId);
+        if (job.getStatus() == AiJobStatus.CANCELLED) {
+            return false;
+        }
         if (job.getStatus() != AiJobStatus.WAITING) {
             throw new InvalidAiJobOperationException("Only waiting jobs can start.");
         }
-        job.start(clock.instant());
+        Instant now = clock.instant();
+        job.start(now);
+        recordEvent(job, now);
+        return true;
     }
 
     @Transactional(readOnly = true)
@@ -118,7 +130,7 @@ class ImageAnalysisJobService {
 
     @Transactional
     public void completeBatch(UUID jobId, List<VisionAnalysis> successes, Map<UUID, String> failures) {
-        AiJobEntity job = requiredJob(jobId);
+        AiJobEntity job = requiredJobForUpdate(jobId);
         Instant now = clock.instant();
         Map<UUID, ImageAnalysisJobItemEntity> items = itemRepository
                 .findByJobIdOrderByDisplayOrderAsc(jobId)
@@ -143,11 +155,16 @@ class ImageAnalysisJobService {
         }
         analysisRepository.saveAll(analyses);
         job.recordBatch(successes.size(), failures.size(), now);
+        recordEvent(job, now);
     }
 
     @Transactional
     public void failRemaining(UUID jobId, String errorCode) {
-        AiJobEntity job = requiredJob(jobId);
+        AiJobEntity job = requiredJobForUpdate(jobId);
+        if (job.getStatus() == AiJobStatus.CANCEL_REQUESTED) {
+            cancelRemaining(jobId);
+            return;
+        }
         if (job.getStatus() != AiJobStatus.RUNNING) {
             return;
         }
@@ -157,7 +174,72 @@ class ImageAnalysisJobService {
         waiting.forEach(item -> item.fail(errorCode, now));
         if (!waiting.isEmpty()) {
             job.recordBatch(0, waiting.size(), now);
+            recordEvent(job, now);
         }
+    }
+
+    @Transactional
+    public void requestCancellation(UUID jobId) {
+        AiJobEntity job = requiredJobForUpdate(jobId);
+        if (job.getStatus() == AiJobStatus.CANCELLED || job.getStatus() == AiJobStatus.CANCEL_REQUESTED) {
+            return;
+        }
+        Instant now = clock.instant();
+        if (job.getStatus() == AiJobStatus.WAITING) {
+            itemRepository.findByJobIdAndStatusOrderByDisplayOrderAsc(jobId, ImageAnalysisItemStatus.WAITING)
+                    .forEach(item -> item.cancel(now));
+            job.requestCancellation(now);
+            recordEvent(job, now);
+            job.cancel(now);
+            recordEvent(job, now);
+            return;
+        }
+        if (job.getStatus() != AiJobStatus.RUNNING) {
+            throw new InvalidAiJobOperationException("Only active jobs can be cancelled.");
+        }
+        job.requestCancellation(now);
+        recordEvent(job, now);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean cancellationRequested(UUID jobId) {
+        return requiredJob(jobId).getStatus() == AiJobStatus.CANCEL_REQUESTED;
+    }
+
+    @Transactional
+    public void cancelRemaining(UUID jobId) {
+        AiJobEntity job = requiredJobForUpdate(jobId);
+        if (job.getStatus() == AiJobStatus.CANCELLED) {
+            return;
+        }
+        if (job.getStatus() != AiJobStatus.CANCEL_REQUESTED) {
+            throw new InvalidAiJobOperationException("Cancellation was not requested for this job.");
+        }
+        Instant now = clock.instant();
+        itemRepository.findByJobIdAndStatusOrderByDisplayOrderAsc(jobId, ImageAnalysisItemStatus.WAITING)
+                .forEach(item -> item.cancel(now));
+        job.cancel(now);
+        recordEvent(job, now);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AiJobProgressEventResponse> eventsAfter(UUID jobId, long lastEventId) {
+        if (lastEventId < 0) {
+            throw new IllegalArgumentException("Last-Event-ID must be zero or greater.");
+        }
+        requiredJob(jobId);
+        return eventRepository.findByJobIdAndIdGreaterThanOrderByIdAsc(jobId, lastEventId)
+                .stream()
+                .map(this::toEventResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isTerminal(UUID jobId) {
+        return switch (requiredJob(jobId).getStatus()) {
+            case COMPLETED, PARTIAL_FAILED, FAILED, CANCELLED -> true;
+            default -> false;
+        };
     }
 
     @Transactional(readOnly = true)
@@ -173,24 +255,29 @@ class ImageAnalysisJobService {
     private UUID createJob(UUID postId, UUID parentJobId, List<JobTarget> targets) {
         Instant now = clock.instant();
         UUID jobId = UUID.randomUUID();
-        jobRepository.save(new AiJobEntity(jobId, postId, parentJobId, targets.size(), now));
+        AiJobEntity job = jobRepository.save(new AiJobEntity(jobId, postId, parentJobId, targets.size(), now));
         itemRepository.saveAll(targets.stream()
                 .map(target -> new ImageAnalysisJobItemEntity(
                         UUID.randomUUID(), jobId, target.assetId(), target.displayOrder(), now))
                 .toList());
+        recordEvent(job, now);
         return jobId;
     }
 
     private void requireNoActiveJob(UUID postId) {
         if (jobRepository.existsByBlogPostIdAndStatusIn(
                 postId,
-                List.of(AiJobStatus.WAITING, AiJobStatus.RUNNING))) {
+                List.of(AiJobStatus.WAITING, AiJobStatus.RUNNING, AiJobStatus.CANCEL_REQUESTED))) {
             throw new InvalidAiJobOperationException("An image analysis job is already active for this post.");
         }
     }
 
     private AiJobEntity requiredJob(UUID jobId) {
         return jobRepository.findById(jobId).orElseThrow(() -> new AiJobNotFoundException(jobId));
+    }
+
+    private AiJobEntity requiredJobForUpdate(UUID jobId) {
+        return jobRepository.findByIdForUpdate(jobId).orElseThrow(() -> new AiJobNotFoundException(jobId));
     }
 
     private ImageAnalysisJobItemEntity requiredWaitingItem(
@@ -221,12 +308,30 @@ class ImageAnalysisJobService {
                 job.getCreatedAt(),
                 job.getStartedAt(),
                 job.getCompletedAt(),
+                job.getCancelRequestedAt(),
                 items.stream().map(item -> new ImageAnalysisItemResponse(
                         item.getAssetId(),
                         item.getDisplayOrder(),
                         item.getStatus(),
                         item.getErrorCode(),
                         analysisResponse(analyses.get(item.getAssetId())))).toList());
+    }
+
+    private void recordEvent(AiJobEntity job, Instant now) {
+        eventRepository.save(new AiJobEventEntity(job, now));
+    }
+
+    private AiJobProgressEventResponse toEventResponse(AiJobEventEntity event) {
+        return new AiJobProgressEventResponse(
+                event.getId(),
+                event.getJobId(),
+                event.getStatus(),
+                event.getStage(),
+                event.getTotalItems(),
+                event.getProcessedItems(),
+                event.getFailedItems(),
+                event.getProgress(),
+                event.getOccurredAt());
     }
 
     private ImageAnalysisResponse analysisResponse(BlogImageAnalysisEntity analysis) {

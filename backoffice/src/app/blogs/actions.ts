@@ -6,6 +6,7 @@ import {
   archiveBlogPost,
   BLOG_POST_STATUSES,
   createImageAnalysisJob,
+  cancelImageAnalysisJob,
   deleteBlogAsset,
   duplicateBlogPost,
   reorderBlogAssets,
@@ -28,6 +29,14 @@ export async function retryImageAnalysisAction(postId: string, returnTo: string,
 
   revalidateBlog(postId);
   redirect(detailHref(postId, returnTo, `notice=analysis-retry&jobId=${encodeURIComponent(job.id)}`));
+}
+
+export async function cancelImageAnalysisAction(postId: string, returnTo: string, jobId: string) {
+  const job = await cancelImageAnalysisJob(jobId);
+  if (!job) redirect(detailHref(postId, returnTo, "error=analysis-cancel"));
+
+  revalidateBlog(postId);
+  redirect(detailHref(postId, returnTo, `notice=analysis-cancel&jobId=${encodeURIComponent(job.id)}`));
 }
 
 export async function reorderBlogAssetsAction(

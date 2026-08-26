@@ -7,11 +7,13 @@ import {
   reorderBlogAssetsAction,
   saveBlogDraftAction,
   startImageAnalysisAction,
+  cancelImageAnalysisAction,
   retryImageAnalysisAction,
   updateBlogStatusAction,
 } from "@/app/blogs/actions";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmActionForm } from "@/components/confirm-action-form";
+import { JobLiveProgress } from "@/components/job-live-progress";
 import { BLOG_POST_STATUSES, getAiJob, getBlogPost } from "@/lib/mimir-api";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +57,7 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
       {notice === "asset-delete" && <p className="noticeBanner" role="status">이미지를 삭제했습니다.</p>}
       {notice === "analysis-start" && <p className="noticeBanner" role="status">이미지 분석 작업을 시작했습니다.</p>}
       {notice === "analysis-retry" && <p className="noticeBanner" role="status">실패 이미지 재분석을 시작했습니다.</p>}
+      {notice === "analysis-cancel" && <p className="noticeBanner" role="status">이미지 분석 취소를 요청했습니다.</p>}
       {error && <p className="noticeBanner error" role="alert">요청을 처리하지 못했습니다. 백엔드 연결 상태를 확인해주세요.</p>}
 
       <section className="detailGrid">
@@ -78,17 +81,24 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
           <form action={analysisAction}>
             <button
               className="primaryButton"
-              disabled={post.assets.length === 0 || selectedJob?.status === "WAITING" || selectedJob?.status === "RUNNING"}
+              disabled={post.assets.length === 0 || selectedJob?.status === "WAITING" || selectedJob?.status === "RUNNING" || selectedJob?.status === "CANCEL_REQUESTED"}
               type="submit"
-            >{selectedJob?.status === "WAITING" || selectedJob?.status === "RUNNING" ? "분석 진행 중" : "전체 이미지 분석"}</button>
+            >{selectedJob?.status === "WAITING" || selectedJob?.status === "RUNNING" || selectedJob?.status === "CANCEL_REQUESTED" ? "분석 진행 중" : "전체 이미지 분석"}</button>
           </form>
         </div>
         {selectedJob ? (
           <>
             <div className="jobSummary">
-              <div><strong>{jobStatusLabel(selectedJob.status)}</strong><small>{selectedJob.processedItems} 성공 · {selectedJob.failedItems} 실패 · 총 {selectedJob.totalItems}장</small></div>
-              <progress aria-label="이미지 분석 진행률" max={100} value={selectedJob.progress}>{selectedJob.progress}%</progress>
+              <JobLiveProgress
+                eventUrl={`/api/jobs/${encodeURIComponent(selectedJob.id)}/events`}
+                initialJob={selectedJob}
+              />
               <Link className="actionButton" href={`/blogs/${encodeURIComponent(post.id)}?returnTo=${encodeURIComponent(returnTo)}&jobId=${encodeURIComponent(selectedJob.id)}`}>상태 새로고침</Link>
+              {(selectedJob.status === "WAITING" || selectedJob.status === "RUNNING" || selectedJob.status === "CANCEL_REQUESTED") && (
+                <form action={cancelImageAnalysisAction.bind(null, post.id, returnTo, selectedJob.id)}>
+                  <button className="actionButton" type="submit">분석 취소</button>
+                </form>
+              )}
               {(selectedJob.status === "PARTIAL_FAILED" || selectedJob.status === "FAILED") && (
                 <form action={retryImageAnalysisAction.bind(null, post.id, returnTo, selectedJob.id)}>
                   <button className="actionButton" type="submit">실패 이미지 재분석</button>
@@ -228,19 +238,10 @@ function statusLabel(status: string) {
   } as Record<string, string>)[status] ?? status;
 }
 
-function jobStatusLabel(status: string) {
-  return ({
-    WAITING: "대기 중",
-    RUNNING: "분석 중",
-    COMPLETED: "분석 완료",
-    PARTIAL_FAILED: "일부 이미지 실패",
-    FAILED: "분석 실패",
-  } as Record<string, string>)[status] ?? status;
-}
-
 function analysisItemLabel(status: string, category: string | undefined) {
   if (status === "SUCCEEDED") return category ? `분석 완료 · ${category}` : "분석 완료";
   if (status === "FAILED") return "분석 실패";
+  if (status === "CANCELLED") return "분석 취소됨";
   return "분석 대기 중";
 }
 

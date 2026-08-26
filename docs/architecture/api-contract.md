@@ -79,12 +79,12 @@ The backend rejects a stale or unrelated `baseVersionId`. It never overwrites an
 ```text
 event: job-progress
 id: 18
-data: {"jobId":"01J...","status":"RUNNING","total":20,"processed":15,"failed":1,"stage":"IMAGE_ANALYSIS","occurredAt":"2026-08-20T14:10:00+09:00"}
+data: {"eventId":18,"jobId":"01J...","status":"RUNNING","stage":"IMAGE_ANALYSIS","totalItems":20,"processedItems":15,"failedItems":1,"progress":80,"occurredAt":"2026-08-20T14:10:00+09:00"}
 ```
 
-Events are resumable by event ID. The durable job record remains authoritative after reconnect. A subset of image failures produces `PARTIAL_FAILED`; successful image analysis remains available and only failed items are eligible for targeted retry.
+Events are committed with the job state transition and are resumable with the `Last-Event-ID` request header. The durable job record remains authoritative after reconnect. A subset of image failures produces `PARTIAL_FAILED`; successful image analysis remains available and only failed items are eligible for targeted retry.
 
-The current image-analysis slice implements job creation, durable polling, structured per-image results, and failed-item-only retry. Cancellation and resumable SSE delivery remain the next job-transport slice; clients currently refresh the durable `GET /jobs/{jobId}` representation.
+Cancellation is cooperative. A waiting job is cancelled immediately; a running provider call is allowed to finish its current batch, after which unstarted items become `CANCELLED`. Repeated cancellation of `CANCEL_REQUESTED` or `CANCELLED` jobs is idempotent. The backoffice consumes SSE through a same-origin streaming proxy, while both clients can still refresh the durable `GET /jobs/{jobId}` representation.
 
 ## System status
 

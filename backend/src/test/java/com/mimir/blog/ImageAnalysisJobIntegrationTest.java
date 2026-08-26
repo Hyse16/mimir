@@ -17,6 +17,7 @@ import java.util.stream.IntStream;
 import javax.imageio.ImageIO;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -76,6 +77,11 @@ class ImageAnalysisJobIntegrationTest {
     @Autowired
     private FakeVisionGateway gateway;
 
+    @BeforeEach
+    void resetGateway() {
+        gateway.reset();
+    }
+
     @Test
     void runsSequentialBatchesPersistsPartialFailureAndRetriesOnlyFailedItems() {
         var post = blogService.create(new CreateBlogPostRequest("Vision 배치", "확인된 사실", "", List.of()));
@@ -114,6 +120,68 @@ class ImageAnalysisJobIntegrationTest {
         assertThat(retry.items()).allMatch(item -> item.status() == ImageAnalysisItemStatus.SUCCEEDED);
         assertThat(jobService.detail(jobId).items().subList(0, 3))
                 .allMatch(item -> item.status() == ImageAnalysisItemStatus.FAILED && item.analysis() == null);
+
+        var events = jobService.eventsAfter(jobId, 0);
+        assertThat(events).extracting(event -> event.status())
+                .containsExactly(
+                        AiJobStatus.WAITING,
+                        AiJobStatus.RUNNING,
+                        AiJobStatus.RUNNING,
+                        AiJobStatus.PARTIAL_FAILED);
+        long resumeAfter = events.get(1).eventId();
+        assertThat(jobService.eventsAfter(jobId, resumeAfter))
+                .extracting(event -> event.eventId())
+                .containsExactlyElementsOf(events.subList(2, events.size()).stream()
+                        .map(event -> event.eventId())
+                        .toList());
+    }
+
+    @Test
+    void cancelsRemainingItemsAfterTheCurrentBatchCompletes() {
+        var post = blogService.create(new CreateBlogPostRequest("취소 경계", "확인된 사실", "", List.of()));
+        assetService.upload(post.id(), images(5));
+        UUID jobId = jobService.create(post.id());
+        gateway.afterNextCall(() -> jobService.requestCancellation(jobId));
+
+        runner.run(jobId);
+
+        var cancelled = jobService.detail(jobId);
+        assertThat(gateway.batchSizes()).containsExactly(3);
+        assertThat(cancelled.status()).isEqualTo(AiJobStatus.CANCELLED);
+        assertThat(cancelled.stage()).isEqualTo(AiJobStage.COMPLETE);
+        assertThat(cancelled.processedItems()).isEqualTo(3);
+        assertThat(cancelled.failedItems()).isZero();
+        assertThat(cancelled.progress()).isEqualTo(60);
+        assertThat(cancelled.cancelRequestedAt()).isNotNull();
+        assertThat(cancelled.items().subList(0, 3))
+                .allMatch(item -> item.status() == ImageAnalysisItemStatus.SUCCEEDED);
+        assertThat(cancelled.items().subList(3, 5))
+                .allMatch(item -> item.status() == ImageAnalysisItemStatus.CANCELLED);
+        assertThat(jobService.eventsAfter(jobId, 0)).extracting(event -> event.status())
+                .containsExactly(
+                        AiJobStatus.WAITING,
+                        AiJobStatus.RUNNING,
+                        AiJobStatus.CANCEL_REQUESTED,
+                        AiJobStatus.CANCEL_REQUESTED,
+                        AiJobStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelsAWaitingJobIdempotentlyBeforeTheRunnerStarts() {
+        var post = blogService.create(new CreateBlogPostRequest("대기 취소", "확인된 사실", "", List.of()));
+        assetService.upload(post.id(), images(1));
+        UUID jobId = jobService.create(post.id());
+
+        jobService.requestCancellation(jobId);
+        jobService.requestCancellation(jobId);
+        runner.run(jobId);
+
+        var cancelled = jobService.detail(jobId);
+        assertThat(cancelled.status()).isEqualTo(AiJobStatus.CANCELLED);
+        assertThat(cancelled.items()).allMatch(item -> item.status() == ImageAnalysisItemStatus.CANCELLED);
+        assertThat(gateway.batchSizes()).isEmpty();
+        assertThat(jobService.eventsAfter(jobId, 0)).extracting(event -> event.status())
+                .containsExactly(AiJobStatus.WAITING, AiJobStatus.CANCEL_REQUESTED, AiJobStatus.CANCELLED);
     }
 
     private List<MockMultipartFile> images(int count) {
@@ -154,6 +222,14 @@ class ImageAnalysisJobIntegrationTest {
         private final AtomicInteger calls = new AtomicInteger();
         private final List<Integer> batchSizes = new ArrayList<>();
         private volatile int failingCall = -1;
+        private volatile Runnable afterNextCall;
+
+        void reset() {
+            calls.set(0);
+            batchSizes.clear();
+            failingCall = -1;
+            afterNextCall = null;
+        }
 
         void failNextCall() {
             failingCall = calls.get() + 1;
@@ -161,6 +237,10 @@ class ImageAnalysisJobIntegrationTest {
 
         void clearBatchSizes() {
             batchSizes.clear();
+        }
+
+        void afterNextCall(Runnable callback) {
+            afterNextCall = callback;
         }
 
         List<Integer> batchSizes() {
@@ -174,7 +254,7 @@ class ImageAnalysisJobIntegrationTest {
             if (call == failingCall) {
                 throw new IllegalStateException("simulated local provider failure");
             }
-            return images.stream()
+            List<VisionAnalysis> results = images.stream()
                     .map(image -> new VisionAnalysis(
                             image.assetId(),
                             image.displayOrder(),
@@ -183,6 +263,12 @@ class ImageAnalysisJobIntegrationTest {
                             List.of("object"),
                             null))
                     .toList();
+            Runnable callback = afterNextCall;
+            afterNextCall = null;
+            if (callback != null) {
+                callback.run();
+            }
+            return results;
         }
     }
 }

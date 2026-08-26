@@ -28,6 +28,8 @@ mimir:
     max-pixels: ${MIMIR_IMAGE_MAX_PIXELS:40000000}
   ai:
     vision-batch-size: ${MIMIR_VISION_BATCH_SIZE:3}
+    event-poll-interval: ${MIMIR_AI_EVENT_POLL_INTERVAL:500ms}
+    event-stream-timeout: ${MIMIR_AI_EVENT_STREAM_TIMEOUT:10m}
     ollama:
       base-url: ${MIMIR_OLLAMA_BASE_URL:http://127.0.0.1:11434}
       vision-model: ${MIMIR_OLLAMA_VISION_MODEL:gemma4:latest}

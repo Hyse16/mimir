@@ -63,6 +63,12 @@ class ImageAnalysisJobItemEntity {
         completedAt = now;
     }
 
+    void cancel(Instant now) {
+        status = ImageAnalysisItemStatus.CANCELLED;
+        errorCode = null;
+        completedAt = now;
+    }
+
     UUID getJobId() {
         return jobId;
     }

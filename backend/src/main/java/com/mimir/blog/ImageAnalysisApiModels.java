@@ -41,6 +41,19 @@ final class ImageAnalysisApiModels {
             Instant createdAt,
             Instant startedAt,
             Instant completedAt,
+            Instant cancelRequestedAt,
             List<ImageAnalysisItemResponse> items) {
+    }
+
+    record AiJobProgressEventResponse(
+            long eventId,
+            UUID jobId,
+            AiJobStatus status,
+            AiJobStage stage,
+            int totalItems,
+            int processedItems,
+            int failedItems,
+            int progress,
+            Instant occurredAt) {
     }
 }

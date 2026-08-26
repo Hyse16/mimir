@@ -60,7 +60,7 @@ export type ImageAnalysis = {
 export type ImageAnalysisItem = {
   assetId: string;
   displayOrder: number;
-  status: "WAITING" | "SUCCEEDED" | "FAILED";
+  status: "WAITING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
   errorCode: string | null;
   analysis: ImageAnalysis | null;
 };
@@ -70,7 +70,7 @@ export type AiJob = {
   blogPostId: string;
   parentJobId: string | null;
   jobType: "IMAGE_ANALYSIS";
-  status: "WAITING" | "RUNNING" | "COMPLETED" | "PARTIAL_FAILED" | "FAILED";
+  status: "WAITING" | "RUNNING" | "CANCEL_REQUESTED" | "COMPLETED" | "PARTIAL_FAILED" | "FAILED" | "CANCELLED";
   stage: "QUEUED" | "IMAGE_ANALYSIS" | "COMPLETE";
   totalItems: number;
   processedItems: number;
@@ -79,6 +79,7 @@ export type AiJob = {
   createdAt: string;
   startedAt: string | null;
   completedAt: string | null;
+  cancelRequestedAt: string | null;
   items: ImageAnalysisItem[];
 };
 
@@ -229,7 +230,7 @@ function isAiJob(value: unknown): value is AiJob {
     typeof value.blogPostId === "string" &&
     (typeof value.parentJobId === "string" || value.parentJobId === null) &&
     value.jobType === "IMAGE_ANALYSIS" &&
-    ["WAITING", "RUNNING", "COMPLETED", "PARTIAL_FAILED", "FAILED"].includes(String(value.status)) &&
+    ["WAITING", "RUNNING", "CANCEL_REQUESTED", "COMPLETED", "PARTIAL_FAILED", "FAILED", "CANCELLED"].includes(String(value.status)) &&
     ["QUEUED", "IMAGE_ANALYSIS", "COMPLETE"].includes(String(value.stage)) &&
     typeof value.totalItems === "number" &&
     typeof value.processedItems === "number" &&
@@ -238,10 +239,11 @@ function isAiJob(value: unknown): value is AiJob {
     typeof value.createdAt === "string" &&
     (typeof value.startedAt === "string" || value.startedAt === null) &&
     (typeof value.completedAt === "string" || value.completedAt === null) &&
+    (typeof value.cancelRequestedAt === "string" || value.cancelRequestedAt === null) &&
     Array.isArray(value.items) && value.items.every((item) => isRecord(item) &&
       typeof item.assetId === "string" &&
       typeof item.displayOrder === "number" &&
-      ["WAITING", "SUCCEEDED", "FAILED"].includes(String(item.status)) &&
+      ["WAITING", "SUCCEEDED", "FAILED", "CANCELLED"].includes(String(item.status)) &&
       (typeof item.errorCode === "string" || item.errorCode === null) &&
       (item.analysis === null || isImageAnalysis(item.analysis)));
 }
@@ -382,5 +384,10 @@ export async function getAiJob(jobId: string): Promise<AiJob | null> {
 
 export async function retryFailedImageAnalysis(jobId: string): Promise<AiJob | null> {
   const payload = await sendJson(`/jobs/${encodeURIComponent(jobId)}/retry-failed`, "POST");
+  return isAiJob(payload) ? payload : null;
+}
+
+export async function cancelImageAnalysisJob(jobId: string): Promise<AiJob | null> {
+  const payload = await sendJson(`/jobs/${encodeURIComponent(jobId)}/cancel`, "POST");
   return isAiJob(payload) ? payload : null;
 }

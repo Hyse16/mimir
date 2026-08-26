@@ -203,6 +203,37 @@ def test_starts_and_reads_structured_image_analysis_job() -> None:
     assert job.items[0].analysis.objects == ("cake", "plate")
 
 
+def test_requests_image_analysis_cancellation() -> None:
+    payload = {
+        "id": "job-1",
+        "blogPostId": "post-1",
+        "parentJobId": None,
+        "jobType": "IMAGE_ANALYSIS",
+        "status": "CANCEL_REQUESTED",
+        "stage": "IMAGE_ANALYSIS",
+        "totalItems": 1,
+        "processedItems": 0,
+        "failedItems": 0,
+        "progress": 0,
+        "createdAt": "2026-08-26T10:00:00Z",
+        "startedAt": "2026-08-26T10:00:01Z",
+        "completedAt": None,
+        "cancelRequestedAt": "2026-08-26T10:00:02Z",
+        "items": [{
+            "assetId": "asset-1",
+            "displayOrder": 0,
+            "status": "WAITING",
+            "errorCode": None,
+            "analysis": None,
+        }],
+    }
+    with patch("mimir_application.api_client.urlopen", return_value=Response(json.dumps(payload).encode())) as request:
+        job = MimirApiClient("http://localhost:8080/api/v1").cancel_image_analysis_job("job-1")
+
+    assert request.call_args.args[0].full_url.endswith("/jobs/job-1/cancel")
+    assert job.status == "CANCEL_REQUESTED"
+
+
 def test_surfaces_backend_validation_message() -> None:
     error = HTTPError(
         "http://localhost:8080/api/v1/blog-posts",

@@ -4,7 +4,7 @@ Mimir is a local-first personal AI workspace. The project starts with an AI-assi
 
 ## Status
 
-The repository has completed the executable skeleton and core **STEP 2: Blog CRUD** flow and has begun **STEP 3: Image Pipeline**. Durable drafts and editing are available alongside validated local image storage, the 20-image boundary, persistent ordering, deletion, and shared asset metadata.
+The repository has completed the executable skeleton and core **STEP 2: Blog CRUD** flow and is implementing **STEP 3: Image Pipeline**. Durable drafts and editing are available alongside validated local image storage, ordered derivatives, structured local Vision analysis, resumable SSE progress, partial-failure retry, and cooperative cancellation.
 
 ## Planned architecture
 

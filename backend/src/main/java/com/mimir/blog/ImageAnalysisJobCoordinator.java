@@ -39,4 +39,9 @@ class ImageAnalysisJobCoordinator {
     AiJobResponse detail(UUID jobId) {
         return service.detail(jobId);
     }
+
+    AiJobResponse cancel(UUID jobId) {
+        service.requestCancellation(jobId);
+        return service.detail(jobId);
+    }
 }

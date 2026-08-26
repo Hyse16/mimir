@@ -64,6 +64,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
     upload_button = ft.FilledButton("선택 이미지 업로드", icon=ft.Icons.UPLOAD, disabled=True)
     analysis_button = ft.FilledButton("이미지 분석 시작", icon=ft.Icons.AUTO_AWESOME, disabled=True)
     analysis_refresh_button = ft.OutlinedButton("분석 상태 새로고침", icon=ft.Icons.REFRESH, disabled=True)
+    analysis_cancel_button = ft.OutlinedButton("분석 취소", icon=ft.Icons.CANCEL_OUTLINED, disabled=True)
 
     def refresh_status(_: ft.ControlEvent | None = None) -> None:
         try:
@@ -103,14 +104,16 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         analysis_button.text = "이미지 분석 시작"
         analysis_button.disabled = len(post.assets) == 0
         analysis_refresh_button.disabled = True
+        analysis_cancel_button.disabled = True
         analysis_text.value = "이미지 업로드 후 구조화 분석을 시작할 수 있습니다."
         analysis_text.color = "#5B6470"
 
     def show_job(job: AiJob) -> None:
         nonlocal current_job
         current_job = job
-        active = job.status in {"WAITING", "RUNNING"}
+        active = job.status in {"WAITING", "RUNNING", "CANCEL_REQUESTED"}
         analysis_refresh_button.disabled = not active
+        analysis_cancel_button.disabled = job.status not in {"WAITING", "RUNNING"}
         analysis_button.disabled = active
         analysis_button.text = "분석 진행 중" if active else (
             "실패 이미지 재분석" if job.status in {"PARTIAL_FAILED", "FAILED"} else "전체 이미지 다시 분석"
@@ -173,6 +176,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         analysis_button.text = "이미지 분석 시작"
         analysis_button.disabled = True
         analysis_refresh_button.disabled = True
+        analysis_cancel_button.disabled = True
         analysis_text.value = "이미지 업로드 후 구조화 분석을 시작할 수 있습니다."
         analysis_text.color = "#5B6470"
         page.update()
@@ -277,8 +281,24 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
             analysis_text.color = "#B42318"
         page.update()
 
+    def cancel_analysis(_: ft.ControlEvent) -> None:
+        if current_job is None:
+            return
+        analysis_cancel_button.disabled = True
+        analysis_text.value = "이미지 분석 취소 요청 중…"
+        analysis_text.color = "#5B6470"
+        page.update()
+        try:
+            show_job(client.cancel_image_analysis_job(current_job.id))
+        except (ApiRequestError, BackendUnavailableError):
+            analysis_text.value = "이미지 분석을 취소하지 못했습니다."
+            analysis_text.color = "#B42318"
+            analysis_cancel_button.disabled = False
+        page.update()
+
     analysis_button.on_click = start_analysis
     analysis_refresh_button.on_click = refresh_analysis
+    analysis_cancel_button.on_click = cancel_analysis
 
     def save_draft(_: ft.ControlEvent) -> None:
         nonlocal current_post
@@ -438,7 +458,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                             analysis_text,
                             ft.Row(
                                 alignment=ft.MainAxisAlignment.END,
-                                controls=[analysis_refresh_button, analysis_button],
+                                controls=[analysis_refresh_button, analysis_cancel_button, analysis_button],
                             ),
                         ]
                     ),
