@@ -1,4 +1,4 @@
-# STEP 0 Evidence
+# Local AI Evidence
 
 This directory stores reproducible machine-generated summaries from local-only validation runs.
 
@@ -8,5 +8,6 @@ This directory stores reproducible machine-generated summaries from local-only v
 - `step-0-text-warm.json` — three-run cold/warm Korean text baseline
 - `step-0-text-long-form.json` — repeated long-form Korean Naver blog generation sample
 - `step-0-hermes-memory-write.json` — current Hermes Memory tool-call attempt; not a passing artifact until a pending or committed record is independently verified
+- `step-3-vision-gateway.json` — live `gemma4:latest` result using the production Gateway prompt and schema against three non-sensitive representative fixtures
 
 The vision count runs cycle three known fixtures to validate batching, order, structured output, and throughput. They do not replace later accuracy tests with 10 and 20 distinct representative blog photos.

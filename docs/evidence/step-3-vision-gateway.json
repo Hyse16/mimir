@@ -1,0 +1,53 @@
+{
+  "model": "gemma4:latest",
+  "fixture_count": 3,
+  "total_seconds": 48.43672275,
+  "load_seconds": 0.440498167,
+  "prompt_tokens": 921,
+  "output_tokens": 258,
+  "done_reason": "stop",
+  "checks": {
+    "structured_count_and_order": true,
+    "korean_output": true,
+    "cheesecake_facts": true,
+    "beverage_croissant_facts": true,
+    "cafe_interior_facts": true,
+    "no_invented_visible_text": true,
+    "no_forbidden_experience_claims": true,
+    "within_gateway_timeout": true
+  },
+  "analyses": [
+    {
+      "ordinal": 0,
+      "category": "음식",
+      "description": "접시에 담긴 삼각형 모양의 케이크 조각",
+      "objects": [
+        "접시",
+        "포크"
+      ],
+      "visibleText": null
+    },
+    {
+      "ordinal": 1,
+      "category": "음료 및 음식",
+      "description": "나무 테이블 위에 놓인 라떼 음료와 크루아상",
+      "objects": [
+        "라떼 음료",
+        "크루아상"
+      ],
+      "visibleText": null
+    },
+    {
+      "ordinal": 2,
+      "category": "인테리어 및 가구",
+      "description": "창가에 배치된 식탁과 의자 세트와 실내 화분",
+      "objects": [
+        "식탁",
+        "의자",
+        "화분"
+      ],
+      "visibleText": null
+    }
+  ],
+  "passed": true
+}

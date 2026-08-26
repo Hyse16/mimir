@@ -26,6 +26,9 @@ class OllamaVisionAnalysisGateway implements VisionAnalysisGateway {
     private static final String PROMPT = """
             Analyze each image in order and return only grounded, visible facts.
             Never infer prices, wait times, taste, service quality, visit dates, orders, opinions, or personal experience.
+            Use the least-specific visible label when an exact food, drink, product, or recipe subtype is uncertain.
+            Do not use speculative phrases to introduce details that are not directly visible.
+            Include every clearly visible salient object, including tableware and utensils.
             Use the zero-based ordinal from the supplied image order. Keep descriptions concise and factual.
             Write category, description, and object names in Korean. Preserve visible text exactly as shown.
             """;

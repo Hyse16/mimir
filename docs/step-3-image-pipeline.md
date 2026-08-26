@@ -30,6 +30,7 @@ Blog posts can persist and manage up to 20 ordered image assets from both worksp
 - Resumable SSE progress using event IDs and `Last-Event-ID`; the backoffice updates without a page refresh
 - Cooperative job cancellation: a running Vision batch finishes, then remaining items become `CANCELLED`
 - Flet and backoffice controls for starting analysis, reading progress, viewing per-image results, retrying failures, and cancelling active jobs
+- Reproducible live Gateway quality gate for Korean output, structured order, salient facts, invented text, unsupported experience claims, and the three-minute timeout
 
 ## API
 
@@ -52,10 +53,19 @@ Backend integration tests use PostgreSQL/pgvector and temporary local storage. T
 
 The Python client tests verify multipart framing and asset response parsing. The Flet construction smoke test and Next.js lint, typecheck, and production build verify that image operations remain consumable across both clients.
 
+The production Gateway prompt and JSON Schema were also exercised against the three checked-in non-sensitive fixtures with local `gemma4:latest`. The first quality run exposed an unsupported drink subtype, and a later run omitted a visible utensil. Tightening the prompt to prefer broad visible labels and include salient tableware resolved both failures. The final run passed every quality check in 48.44 seconds total, including 0.44 seconds model load time, with 921 prompt tokens and 258 output tokens. The machine-readable result is stored in `docs/evidence/step-3-vision-gateway.json`.
+
+Reproduce the same live check without external provider fallback:
+
+```bash
+VISION_RESULT_PATH=docs/evidence/step-3-vision-gateway.json \
+  ./scripts/step3/verify-vision-gateway.sh gemma4:latest
+```
+
 ## Remaining STEP 3 work
 
 - Portable WebP decoding and derivative generation
-- Live model quality and latency verification with representative personal images
+- Private acceptance sampling with user-owned blog photos; do not commit those images or raw outputs
 
 ## Upstream contract references
 

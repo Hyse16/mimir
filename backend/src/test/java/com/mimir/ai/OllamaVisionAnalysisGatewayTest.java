@@ -35,6 +35,8 @@ class OllamaVisionAnalysisGatewayTest {
                 .andExpect(content().string(containsString("AQID")))
                 .andExpect(content().string(containsString("BAUG")))
                 .andExpect(content().string(containsString("\"format\"")))
+                .andExpect(content().string(containsString("least-specific visible label")))
+                .andExpect(content().string(containsString("tableware and utensils")))
                 .andRespond(withSuccess(
                         """
                                 {"message":{"content":"{\\"analyses\\":[{\\"ordinal\\":1,\\"category\\":\\"food\\",\\"description\\":\\"cake on a plate\\",\\"objects\\":[\\"cake\\",\\"plate\\"],\\"visibleText\\":null},{\\"ordinal\\":0,\\"category\\":\\"interior\\",\\"description\\":\\"wooden table\\",\\"objects\\":[\\"table\\"],\\"visibleText\\":\\"MENU\\"}]}"}}
