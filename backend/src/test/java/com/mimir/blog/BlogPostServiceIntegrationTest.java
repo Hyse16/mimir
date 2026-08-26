@@ -6,6 +6,12 @@ import static com.mimir.blog.BlogApiModels.UpdateBlogPostRequest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
@@ -21,6 +27,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+
+import javax.imageio.ImageIO;
 
 @Testcontainers
 @SpringBootTest
@@ -44,6 +52,9 @@ class BlogPostServiceIntegrationTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("mimir.storage.local-root", () -> ASSET_ROOT);
+        registry.add("mimir.image.optimized-max-dimension", () -> 4);
+        registry.add("mimir.image.analysis-max-dimension", () -> 2);
+        registry.add("mimir.image.max-pixels", () -> 100);
     }
 
     @Autowired
@@ -51,6 +62,9 @@ class BlogPostServiceIntegrationTest {
 
     @Autowired
     private BlogAssetService assetService;
+
+    @Autowired
+    private BlogAssetRepository assetRepository;
 
     @Test
     void preservesEveryDraftVersionAndCanSelectAnOlderVersion() {
@@ -184,6 +198,73 @@ class BlogPostServiceIntegrationTest {
     }
 
     @Test
+    void createsBoundedOptimizedAndAnalysisDerivatives() {
+        var post = createPost("이미지 파생본");
+
+        var asset = assetService.upload(post.id(), List.of(image("landscape.png", 8, 4))).getFirst();
+        var stored = assetRepository.findById(asset.id()).orElseThrow();
+
+        assertThat(asset.width()).isEqualTo(8);
+        assertThat(asset.height()).isEqualTo(4);
+        assertThat(asset.derivativeStatus()).isEqualTo(BlogAssetDerivativeStatus.READY);
+        assertThat(asset.optimizedImage()).satisfies(optimized -> {
+            assertThat(optimized.contentType()).isEqualTo("image/jpeg");
+            assertThat(optimized.width()).isEqualTo(4);
+            assertThat(optimized.height()).isEqualTo(2);
+            assertThat(optimized.byteSize()).isPositive();
+        });
+        assertThat(asset.analysisImage()).satisfies(analysis -> {
+            assertThat(analysis.contentType()).isEqualTo("image/jpeg");
+            assertThat(analysis.width()).isEqualTo(2);
+            assertThat(analysis.height()).isEqualTo(1);
+            assertThat(analysis.byteSize()).isPositive();
+        });
+        assertThat(Files.exists(Path.of(ASSET_ROOT).resolve(stored.getOptimizedStorageKey()))).isTrue();
+        assertThat(Files.exists(Path.of(ASSET_ROOT).resolve(stored.getAnalysisStorageKey()))).isTrue();
+    }
+
+    @Test
+    void decodesJpegUploadsBeforeCreatingDerivatives() {
+        var post = createPost("JPEG 파생본");
+        var jpeg = new MockMultipartFile("files", "photo.jpg", "image/jpeg", jpegImage(6, 3));
+
+        var asset = assetService.upload(post.id(), List.of(jpeg)).getFirst();
+
+        assertThat(asset.width()).isEqualTo(6);
+        assertThat(asset.height()).isEqualTo(3);
+        assertThat(asset.derivativeStatus()).isEqualTo(BlogAssetDerivativeStatus.READY);
+        assertThat(asset.analysisImage()).isNotNull();
+    }
+
+    @Test
+    void rejectsImagesAboveTheDecodedPixelLimit() {
+        var post = createPost("과도한 해상도");
+
+        assertThatThrownBy(() -> assetService.upload(post.id(), List.of(image("large.png", 11, 10))))
+                .isInstanceOf(InvalidBlogAssetException.class)
+                .hasMessageContaining("pixel limit");
+        assertThat(assetService.list(post.id())).isEmpty();
+    }
+
+    @Test
+    void removesEarlierDerivativesWhenALaterImageInTheBatchIsInvalid() throws IOException {
+        var post = createPost("부분 저장 방지");
+        var valid = image("valid.png", 8, 4);
+        var invalid = new MockMultipartFile("files", "invalid.png", "image/png", "not-an-image".getBytes());
+
+        assertThatThrownBy(() -> assetService.upload(post.id(), List.of(valid, invalid)))
+                .isInstanceOf(InvalidBlogAssetException.class);
+
+        assertThat(assetService.list(post.id())).isEmpty();
+        Path postRoot = Path.of(ASSET_ROOT).resolve(post.id().toString());
+        if (Files.exists(postRoot)) {
+            try (var paths = Files.walk(postRoot)) {
+                assertThat(paths.filter(Files::isRegularFile)).isEmpty();
+            }
+        }
+    }
+
+    @Test
     void rejectsTheTwentyFirstImageWithoutChangingStoredAssets() {
         var post = createPost("최대 이미지");
         assetService.upload(post.id(), images(20));
@@ -211,6 +292,7 @@ class BlogPostServiceIntegrationTest {
     void deletesAnAssetAndCompactsTheRemainingOrder() {
         var post = createPost("이미지 삭제");
         var uploaded = assetService.upload(post.id(), images(3));
+        var removed = assetRepository.findById(uploaded.get(1).id()).orElseThrow();
 
         var remaining = assetService.delete(post.id(), uploaded.get(1).id());
 
@@ -218,12 +300,15 @@ class BlogPostServiceIntegrationTest {
                 .containsExactly(uploaded.getFirst().id(), uploaded.getLast().id());
         assertThat(remaining).extracting(BlogApiModels.BlogAssetResponse::displayOrder)
                 .containsExactly(0, 1);
+        assertThat(Files.exists(Path.of(ASSET_ROOT).resolve(removed.getStorageKey()))).isFalse();
+        assertThat(Files.exists(Path.of(ASSET_ROOT).resolve(removed.getOptimizedStorageKey()))).isFalse();
+        assertThat(Files.exists(Path.of(ASSET_ROOT).resolve(removed.getAnalysisStorageKey()))).isFalse();
     }
 
     @Test
     void sanitizesOriginalNamesAndRejectsSpoofedImageContent() {
         var post = createPost("안전한 업로드");
-        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01};
+        byte[] png = pngImage(8, 4);
         var safe = new MockMultipartFile("files", "../../private/photo.png", "image/png", png);
         var spoofed = new MockMultipartFile("files", "photo.png", "image/png", "not-an-image".getBytes());
 
@@ -239,13 +324,42 @@ class BlogPostServiceIntegrationTest {
     }
 
     private List<MockMultipartFile> images(int count) {
-        byte[] png = new byte[] {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01};
+        byte[] png = pngImage(8, 4);
         return IntStream.range(0, count)
-                .mapToObj(index -> new MockMultipartFile(
-                        "files",
-                        "image-" + index + ".png",
-                        "image/png",
-                        png))
+                .mapToObj(index -> image("image-" + index + ".png", png))
                 .toList();
+    }
+
+    private MockMultipartFile image(String filename, int width, int height) {
+        return image(filename, pngImage(width, height));
+    }
+
+    private MockMultipartFile image(String filename, byte[] content) {
+        return new MockMultipartFile("files", filename, "image/png", content);
+    }
+
+    private byte[] pngImage(int width, int height) {
+        return encodedImage(width, height, BufferedImage.TYPE_INT_ARGB, "png");
+    }
+
+    private byte[] jpegImage(int width, int height) {
+        return encodedImage(width, height, BufferedImage.TYPE_INT_RGB, "jpeg");
+    }
+
+    private byte[] encodedImage(int width, int height, int imageType, String format) {
+        BufferedImage image = new BufferedImage(width, height, imageType);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                image.setRGB(x, y, new Color(x * 20 % 255, y * 40 % 255, 120, 180).getRGB());
+            }
+        }
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            if (!ImageIO.write(image, format, output)) {
+                throw new IllegalStateException(format + " test encoder is unavailable.");
+            }
+            return output.toByteArray();
+        } catch (IOException error) {
+            throw new IllegalStateException("Unable to build image test data.", error);
+        }
     }
 }

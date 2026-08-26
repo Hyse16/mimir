@@ -135,6 +135,11 @@ def test_uploads_images_as_multipart_assets() -> None:
         "originalFilename": "cafe.png",
         "contentType": "image/png",
         "byteSize": 9,
+        "width": 1200,
+        "height": 800,
+        "derivativeStatus": "READY",
+        "optimizedImage": {"contentType": "image/jpeg", "byteSize": 7, "width": 1200, "height": 800},
+        "analysisImage": {"contentType": "image/jpeg", "byteSize": 5, "width": 960, "height": 640},
         "createdAt": "2026-08-24T10:00:00Z",
     }]).encode())
     image = ImageUpload("cafe.png", "image/png", b"\x89PNG\r\n\x1a\n\x01")
@@ -148,6 +153,8 @@ def test_uploads_images_as_multipart_assets() -> None:
     assert b'name="files"; filename="cafe.png"' in sent.data
     assert image.content in sent.data
     assert assets[0].original_filename == "cafe.png"
+    assert assets[0].analysis_image is not None
+    assert assets[0].analysis_image.width == 960
 
 
 def test_surfaces_backend_validation_message() -> None:

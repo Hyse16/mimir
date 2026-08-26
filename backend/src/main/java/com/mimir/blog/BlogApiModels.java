@@ -61,7 +61,19 @@ final class BlogApiModels {
             String originalFilename,
             String contentType,
             long byteSize,
+            Integer width,
+            Integer height,
+            BlogAssetDerivativeStatus derivativeStatus,
+            ImageVariantResponse optimizedImage,
+            ImageVariantResponse analysisImage,
             Instant createdAt) {
+    }
+
+    record ImageVariantResponse(
+            String contentType,
+            long byteSize,
+            int width,
+            int height) {
     }
 
     record ReorderBlogAssetsRequest(

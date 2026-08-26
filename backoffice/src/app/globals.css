@@ -610,6 +610,14 @@ h1 {
   font-size: 12px;
 }
 
+.assetList .derivativeReady {
+  color: #067647;
+}
+
+.assetList .derivativePending {
+  color: #b54708;
+}
+
 .assetOrder {
   display: grid;
   place-items: center;

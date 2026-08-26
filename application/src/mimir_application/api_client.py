@@ -36,12 +36,25 @@ class BlogPostSummary:
 
 
 @dataclass(frozen=True)
+class ImageVariant:
+    content_type: str
+    byte_size: int
+    width: int
+    height: int
+
+
+@dataclass(frozen=True)
 class BlogAsset:
     id: str
     display_order: int
     original_filename: str
     content_type: str
     byte_size: int
+    width: int | None
+    height: int | None
+    derivative_status: str
+    optimized_image: ImageVariant | None
+    analysis_image: ImageVariant | None
     created_at: str
 
 
@@ -281,7 +294,25 @@ class MimirApiClient:
             original_filename=str(payload["originalFilename"]),
             content_type=str(payload["contentType"]),
             byte_size=int(payload["byteSize"]),
+            width=int(payload["width"]) if payload["width"] is not None else None,
+            height=int(payload["height"]) if payload["height"] is not None else None,
+            derivative_status=str(payload["derivativeStatus"]),
+            optimized_image=MimirApiClient._image_variant(payload["optimizedImage"]),
+            analysis_image=MimirApiClient._image_variant(payload["analysisImage"]),
             created_at=str(payload["createdAt"]),
+        )
+
+    @staticmethod
+    def _image_variant(payload: Any) -> ImageVariant | None:
+        if payload is None:
+            return None
+        if not isinstance(payload, dict):
+            raise TypeError
+        return ImageVariant(
+            content_type=str(payload["contentType"]),
+            byte_size=int(payload["byteSize"]),
+            width=int(payload["width"]),
+            height=int(payload["height"]),
         )
 
     @staticmethod

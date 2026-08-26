@@ -32,7 +32,19 @@ export type BlogAsset = {
   originalFilename: string;
   contentType: string;
   byteSize: number;
+  width: number | null;
+  height: number | null;
+  derivativeStatus: "READY" | "ORIGINAL_ONLY";
+  optimizedImage: ImageVariant | null;
+  analysisImage: ImageVariant | null;
   createdAt: string;
+};
+
+export type ImageVariant = {
+  contentType: string;
+  byteSize: number;
+  width: number;
+  height: number;
 };
 
 export type BlogPostDetail = BlogPostSummary & {
@@ -148,8 +160,21 @@ function isBlogAsset(value: unknown): value is BlogAsset {
     typeof value.originalFilename === "string" &&
     typeof value.contentType === "string" &&
     typeof value.byteSize === "number" &&
+    (typeof value.width === "number" || value.width === null) &&
+    (typeof value.height === "number" || value.height === null) &&
+    (value.derivativeStatus === "READY" || value.derivativeStatus === "ORIGINAL_ONLY") &&
+    (value.optimizedImage === null || isImageVariant(value.optimizedImage)) &&
+    (value.analysisImage === null || isImageVariant(value.analysisImage)) &&
     typeof value.createdAt === "string"
   );
+}
+
+function isImageVariant(value: unknown): value is ImageVariant {
+  return isRecord(value) &&
+    typeof value.contentType === "string" &&
+    typeof value.byteSize === "number" &&
+    typeof value.width === "number" &&
+    typeof value.height === "number";
 }
 
 function isBlogPostPage(value: unknown): value is BlogPostPage {

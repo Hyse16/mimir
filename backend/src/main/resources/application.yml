@@ -20,6 +20,12 @@ mimir:
   storage:
     local-root: ${MIMIR_STORAGE_LOCAL_ROOT:./data/assets}
     max-image-bytes: ${MIMIR_MAX_IMAGE_BYTES:15728640}
+  image:
+    optimized-max-dimension: ${MIMIR_OPTIMIZED_IMAGE_MAX_DIMENSION:2048}
+    analysis-max-dimension: ${MIMIR_ANALYSIS_IMAGE_MAX_DIMENSION:1280}
+    optimized-jpeg-quality: ${MIMIR_OPTIMIZED_IMAGE_JPEG_QUALITY:0.85}
+    analysis-jpeg-quality: ${MIMIR_ANALYSIS_IMAGE_JPEG_QUALITY:0.80}
+    max-pixels: ${MIMIR_IMAGE_MAX_PIXELS:40000000}
 
 management:
   endpoints:

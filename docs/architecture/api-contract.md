@@ -38,15 +38,16 @@ The `traceId` correlates non-sensitive logs. Prompts, browser cookies, OAuth tok
 | `POST` | `/api/v1/blog-posts/{postId}/duplicate` | Copy the selected draft and factual context into an independent draft post |
 | `POST` | `/api/v1/blog-posts/{postId}/assets` | Upload and append validated assets, enforcing the total limit of 20 |
 | `PUT` | `/api/v1/blog-posts/{postId}/assets/order` | Persist complete display order |
+| `DELETE` | `/api/v1/blog-posts/{postId}/assets/{assetId}` | Delete one original and its derivatives, then compact display order |
 | `POST` | `/api/v1/blog-posts/{postId}/versions` | Save a user edit or AI revision as an immutable version |
 | `GET` | `/api/v1/blog-posts/{postId}/versions` | List version summaries newest first |
 | `GET` | `/api/v1/blog-posts/{postId}/versions/{versionId}` | Read one version |
 | `POST` | `/api/v1/blog-posts/{postId}/versions/{versionId}/select` | Select a version as the current approved draft |
 | `POST` | `/api/v1/blog-posts/{postId}/prepare-naver` | Build a preview and copy/export payload from the selected version |
 
-Destructive deletion is excluded from the first vertical slice. Archive is reversible and keeps version and job history coherent.
+Destructive blog-post deletion is excluded from the first vertical slice. Asset deletion is available with explicit confirmation; post archive remains reversible and keeps version and job history coherent.
 
-Image uploads use multipart field `files`, allow JPEG, PNG, and WebP only, and enforce both declared-type/signature matching and the configured size limit. Ordering requests contain every current asset ID exactly once; partial or duplicate order lists are rejected.
+Image uploads use multipart field `files`, allow JPEG, PNG, and WebP only, and enforce both declared-type/signature matching and the configured size limit. JPEG and PNG uploads are decoded with a pixel ceiling and receive optimized and Vision-analysis JPEG derivatives. Asset responses expose original dimensions, `derivativeStatus`, and nullable optimized/analysis variant metadata; storage keys remain internal. WebP is reported as `ORIGINAL_ONLY` until a portable codec dependency is approved. Ordering requests contain every current asset ID exactly once; partial or duplicate order lists are rejected.
 
 ## Revision request
 

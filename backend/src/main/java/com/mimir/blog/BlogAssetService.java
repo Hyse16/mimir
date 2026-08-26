@@ -1,6 +1,7 @@
 package com.mimir.blog;
 
 import static com.mimir.blog.BlogApiModels.BlogAssetResponse;
+import static com.mimir.blog.BlogApiModels.ImageVariantResponse;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -31,6 +32,7 @@ public class BlogAssetService {
     private final BlogPostRepository postRepository;
     private final BlogAssetRepository assetRepository;
     private final StorageProvider storageProvider;
+    private final ImageDerivativeProcessor derivativeProcessor;
     private final Clock clock;
     private final long maxImageBytes;
 
@@ -39,19 +41,22 @@ public class BlogAssetService {
             BlogPostRepository postRepository,
             BlogAssetRepository assetRepository,
             StorageProvider storageProvider,
+            ImageDerivativeProcessor derivativeProcessor,
             @Value("${mimir.storage.max-image-bytes:15728640}") long maxImageBytes) {
-        this(postRepository, assetRepository, storageProvider, Clock.systemUTC(), maxImageBytes);
+        this(postRepository, assetRepository, storageProvider, derivativeProcessor, Clock.systemUTC(), maxImageBytes);
     }
 
     BlogAssetService(
             BlogPostRepository postRepository,
             BlogAssetRepository assetRepository,
             StorageProvider storageProvider,
+            ImageDerivativeProcessor derivativeProcessor,
             Clock clock,
             long maxImageBytes) {
         this.postRepository = postRepository;
         this.assetRepository = assetRepository;
         this.storageProvider = storageProvider;
+        this.derivativeProcessor = derivativeProcessor;
         this.clock = clock;
         this.maxImageBytes = maxImageBytes;
     }
@@ -75,17 +80,21 @@ public class BlogAssetService {
             throw new BlogAssetLimitExceededException();
         }
 
-        List<ValidatedImage> images = files.stream().map(this::validate).toList();
         Instant now = clock.instant();
         List<BlogAssetEntity> assets = new ArrayList<>();
         List<String> storedKeys = new ArrayList<>();
         try {
-            for (int index = 0; index < images.size(); index++) {
-                ValidatedImage image = images.get(index);
+            for (int index = 0; index < files.size(); index++) {
+                ValidatedImage image = validate(files.get(index));
                 UUID assetId = UUID.randomUUID();
                 String storageKey = postId + "/" + assetId + "/original." + image.extension();
                 storageProvider.store(storageKey, image.content());
                 storedKeys.add(storageKey);
+                var processed = image.processed();
+                String optimizedStorageKey = storeDerivative(
+                        postId, assetId, "optimized.jpg", processed.optimized(), storedKeys);
+                String analysisStorageKey = storeDerivative(
+                        postId, assetId, "analysis.jpg", processed.analysis(), storedKeys);
                 assets.add(new BlogAssetEntity(
                         assetId,
                         postId,
@@ -94,6 +103,19 @@ public class BlogAssetService {
                         image.contentType(),
                         image.content().length,
                         storageKey,
+                        processed.originalWidth(),
+                        processed.originalHeight(),
+                        processed.status(),
+                        optimizedStorageKey,
+                        contentType(processed.optimized()),
+                        byteSize(processed.optimized()),
+                        width(processed.optimized()),
+                        height(processed.optimized()),
+                        analysisStorageKey,
+                        contentType(processed.analysis()),
+                        byteSize(processed.analysis()),
+                        width(processed.analysis()),
+                        height(processed.analysis()),
                         now));
             }
             assetRepository.saveAllAndFlush(assets);
@@ -135,6 +157,8 @@ public class BlogAssetService {
         post.touch(clock.instant());
         rewriteOrders(postId, remainingIds);
         storageProvider.delete(asset.getStorageKey());
+        deleteIfPresent(asset.getOptimizedStorageKey());
+        deleteIfPresent(asset.getAnalysisStorageKey());
         return assetRepository.findByBlogPostIdOrderByDisplayOrderAsc(postId).stream()
                 .map(BlogAssetService::toResponse)
                 .toList();
@@ -147,6 +171,19 @@ public class BlogAssetService {
                 asset.getOriginalFilename(),
                 asset.getContentType(),
                 asset.getByteSize(),
+                asset.getOriginalWidth(),
+                asset.getOriginalHeight(),
+                asset.getDerivativeStatus(),
+                variantResponse(
+                        asset.getOptimizedContentType(),
+                        asset.getOptimizedByteSize(),
+                        asset.getOptimizedWidth(),
+                        asset.getOptimizedHeight()),
+                variantResponse(
+                        asset.getAnalysisContentType(),
+                        asset.getAnalysisByteSize(),
+                        asset.getAnalysisWidth(),
+                        asset.getAnalysisHeight()),
                 asset.getCreatedAt());
     }
 
@@ -175,11 +212,55 @@ public class BlogAssetService {
         if (!matchesSignature(contentType, content)) {
             throw new InvalidBlogAssetException("Image content does not match its declared type.");
         }
+        var processed = derivativeProcessor.process(contentType, content);
         return new ValidatedImage(
                 safeFilename(file.getOriginalFilename()),
                 contentType,
                 extension(contentType),
-                content);
+                content,
+                processed);
+    }
+
+    private String storeDerivative(
+            UUID postId,
+            UUID assetId,
+            String filename,
+            ImageDerivativeProcessor.ImageVariant variant,
+            List<String> storedKeys) {
+        if (variant == null) {
+            return null;
+        }
+        String key = postId + "/" + assetId + "/" + filename;
+        storageProvider.store(key, variant.content());
+        storedKeys.add(key);
+        return key;
+    }
+
+    private static String contentType(ImageDerivativeProcessor.ImageVariant variant) {
+        return variant == null ? null : variant.contentType();
+    }
+
+    private static Long byteSize(ImageDerivativeProcessor.ImageVariant variant) {
+        return variant == null ? null : (long) variant.content().length;
+    }
+
+    private static Integer width(ImageDerivativeProcessor.ImageVariant variant) {
+        return variant == null ? null : variant.width();
+    }
+
+    private static Integer height(ImageDerivativeProcessor.ImageVariant variant) {
+        return variant == null ? null : variant.height();
+    }
+
+    private static ImageVariantResponse variantResponse(
+            String contentType,
+            Long byteSize,
+            Integer width,
+            Integer height) {
+        if (contentType == null || byteSize == null || width == null || height == null) {
+            return null;
+        }
+        return new ImageVariantResponse(contentType, byteSize, width, height);
     }
 
     private void rewriteOrders(UUID postId, List<UUID> assetIds) {
@@ -261,6 +342,12 @@ public class BlogAssetService {
         }
     }
 
+    private void deleteIfPresent(String storageKey) {
+        if (storageKey != null) {
+            storageProvider.delete(storageKey);
+        }
+    }
+
     private void cleanupOnRollback(List<String> storageKeys) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             return;
@@ -275,6 +362,11 @@ public class BlogAssetService {
         });
     }
 
-    private record ValidatedImage(String filename, String contentType, String extension, byte[] content) {
+    private record ValidatedImage(
+            String filename,
+            String contentType,
+            String extension,
+            byte[] content,
+            ImageDerivativeProcessor.ProcessedImage processed) {
     }
 }

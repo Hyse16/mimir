@@ -101,7 +101,15 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
             {post.assets.map((asset, index) => (
               <li key={asset.id}>
                 <span className="assetOrder">{asset.displayOrder + 1}</span>
-                <span className="assetMetadata"><strong>{asset.originalFilename}</strong><small>{asset.contentType} · {formatBytes(asset.byteSize)}</small></span>
+                <span className="assetMetadata">
+                  <strong>{asset.originalFilename}</strong>
+                  <small>{asset.contentType} · {formatBytes(asset.byteSize)} · {formatDimensions(asset.width, asset.height)}</small>
+                  <small className={asset.derivativeStatus === "READY" ? "derivativeReady" : "derivativePending"}>
+                    {asset.derivativeStatus === "READY"
+                      ? `최적화 ${formatVariant(asset.optimizedImage)} · 분석 ${formatVariant(asset.analysisImage)}`
+                      : "원본만 저장됨 · WebP 파생 처리는 디코더 도입 후 지원"}
+                  </small>
+                </span>
                 <div className="assetActions">
                   <form action={reorderBlogAssetsAction.bind(null, post.id, returnTo, moveAsset(assetIds, index, -1))}>
                     <button aria-label={`${asset.originalFilename} 위로 이동`} className="orderButton" disabled={index === 0} type="submit">↑</button>
@@ -176,6 +184,14 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDimensions(width: number | null, height: number | null) {
+  return width && height ? `${width}×${height}` : "해상도 미확인";
+}
+
+function formatVariant(variant: { width: number; height: number; byteSize: number } | null) {
+  return variant ? `${variant.width}×${variant.height} · ${formatBytes(variant.byteSize)}` : "없음";
 }
 
 function moveAsset(assetIds: string[], index: number, offset: -1 | 1) {
