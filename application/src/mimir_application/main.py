@@ -3,6 +3,7 @@ import mimetypes
 import flet as ft
 
 from mimir_application.api_client import (
+    AiJob,
     ApiRequestError,
     BackendUnavailableError,
     BlogPostDetail,
@@ -16,6 +17,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
     settings = config or AppConfig.from_environment()
     client = MimirApiClient(settings.api_base_url)
     current_post: BlogPostDetail | None = None
+    current_job: AiJob | None = None
     selected_images: list[ImageUpload] = []
 
     page.title = "Mimir"
@@ -57,8 +59,11 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
     selector_text = ft.Text("새 초안을 작성하거나 기존 게시글을 불러올 수 있습니다.", color="#5B6470")
     result_text = ft.Text("아직 저장된 초안이 없습니다.", color="#5B6470")
     asset_text = ft.Text("게시글을 저장한 뒤 이미지를 최대 20장까지 추가할 수 있습니다.", color="#5B6470")
+    analysis_text = ft.Text("이미지 업로드 후 구조화 분석을 시작할 수 있습니다.", color="#5B6470")
     save_button = ft.FilledButton("첫 초안 저장", icon=ft.Icons.SAVE_OUTLINED)
     upload_button = ft.FilledButton("선택 이미지 업로드", icon=ft.Icons.UPLOAD, disabled=True)
+    analysis_button = ft.FilledButton("이미지 분석 시작", icon=ft.Icons.AUTO_AWESOME, disabled=True)
+    analysis_refresh_button = ft.OutlinedButton("분석 상태 새로고침", icon=ft.Icons.REFRESH, disabled=True)
 
     def refresh_status(_: ft.ControlEvent | None = None) -> None:
         try:
@@ -78,7 +83,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         return [tag.strip() for tag in (tags_field.value or "").split(",") if tag.strip()]
 
     def show_post(post: BlogPostDetail) -> None:
-        nonlocal current_post
+        nonlocal current_post, current_job
         current_post = post
         post_selector.value = post.id
         title_field.value = post.current_version.title
@@ -94,6 +99,27 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         upload_button.disabled = True
         asset_text.value = f"저장된 이미지 {len(post.assets)} / 20장"
         asset_text.color = "#5B6470"
+        current_job = None
+        analysis_button.text = "이미지 분석 시작"
+        analysis_button.disabled = len(post.assets) == 0
+        analysis_refresh_button.disabled = True
+        analysis_text.value = "이미지 업로드 후 구조화 분석을 시작할 수 있습니다."
+        analysis_text.color = "#5B6470"
+
+    def show_job(job: AiJob) -> None:
+        nonlocal current_job
+        current_job = job
+        active = job.status in {"WAITING", "RUNNING"}
+        analysis_refresh_button.disabled = not active
+        analysis_button.disabled = active
+        analysis_button.text = "분석 진행 중" if active else (
+            "실패 이미지 재분석" if job.status in {"PARTIAL_FAILED", "FAILED"} else "전체 이미지 다시 분석"
+        )
+        analysis_text.value = (
+            f"{job.status} · 성공 {job.processed_items} · 실패 {job.failed_items} · "
+            f"전체 {job.total_items} · {job.progress}%"
+        )
+        analysis_text.color = "#B42318" if job.failed_items else "#16803C"
 
     def refresh_posts(_: ft.ControlEvent | None = None) -> None:
         try:
@@ -126,7 +152,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         page.update()
 
     def start_new(_: ft.ControlEvent) -> None:
-        nonlocal current_post
+        nonlocal current_post, current_job
         current_post = None
         post_selector.value = None
         post_selector.error_text = None
@@ -143,6 +169,12 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         upload_button.disabled = True
         asset_text.value = "게시글을 저장한 뒤 이미지를 최대 20장까지 추가할 수 있습니다."
         asset_text.color = "#5B6470"
+        current_job = None
+        analysis_button.text = "이미지 분석 시작"
+        analysis_button.disabled = True
+        analysis_refresh_button.disabled = True
+        analysis_text.value = "이미지 업로드 후 구조화 분석을 시작할 수 있습니다."
+        analysis_text.color = "#5B6470"
         page.update()
 
     async def pick_images(_: ft.ControlEvent) -> None:
@@ -210,6 +242,43 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
             page.update()
 
     upload_button.on_click = upload_images
+
+    def start_analysis(_: ft.ControlEvent) -> None:
+        if current_post is None or not current_post.assets:
+            return
+        analysis_button.disabled = True
+        analysis_text.value = "이미지 분석 작업 요청 중…"
+        analysis_text.color = "#5B6470"
+        page.update()
+        try:
+            job = (
+                client.retry_failed_image_analysis(current_job.id)
+                if current_job is not None and current_job.status in {"PARTIAL_FAILED", "FAILED"}
+                else client.create_image_analysis_job(current_post.id)
+            )
+            show_job(job)
+        except ApiRequestError as error:
+            analysis_text.value = f"이미지 분석 요청 실패: {error}"
+            analysis_text.color = "#B42318"
+            analysis_button.disabled = False
+        except BackendUnavailableError:
+            analysis_text.value = "이미지 분석 요청 실패: 업무 서버에 연결할 수 없습니다."
+            analysis_text.color = "#B42318"
+            analysis_button.disabled = False
+        page.update()
+
+    def refresh_analysis(_: ft.ControlEvent) -> None:
+        if current_job is None:
+            return
+        try:
+            show_job(client.get_ai_job(current_job.id))
+        except (ApiRequestError, BackendUnavailableError):
+            analysis_text.value = "이미지 분석 상태를 불러오지 못했습니다."
+            analysis_text.color = "#B42318"
+        page.update()
+
+    analysis_button.on_click = start_analysis
+    analysis_refresh_button.on_click = refresh_analysis
 
     def save_draft(_: ft.ControlEvent) -> None:
         nonlocal current_post
@@ -364,6 +433,12 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                                     ft.OutlinedButton("이미지 선택", icon=ft.Icons.IMAGE_OUTLINED, on_click=pick_images),
                                     upload_button,
                                 ],
+                            ),
+                            ft.Divider(height=20, color="#E4E7EC"),
+                            analysis_text,
+                            ft.Row(
+                                alignment=ft.MainAxisAlignment.END,
+                                controls=[analysis_refresh_button, analysis_button],
                             ),
                         ]
                     ),

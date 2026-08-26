@@ -12,9 +12,11 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import com.mimir.blog.BlogAssetLimitExceededException;
 import com.mimir.blog.BlogAssetNotFoundException;
+import com.mimir.blog.AiJobNotFoundException;
 import com.mimir.blog.BlogNotFoundException;
 import com.mimir.blog.BlogPostService;
 import com.mimir.blog.InvalidBlogAssetException;
+import com.mimir.blog.InvalidAiJobOperationException;
 import com.mimir.blog.StaleDraftVersionException;
 
 @RestControllerAdvice(basePackageClasses = BlogPostService.class)
@@ -56,6 +58,16 @@ public class ApiExceptionHandler {
     @ExceptionHandler(BlogAssetNotFoundException.class)
     ResponseEntity<ApiErrorResponse> assetNotFound() {
         return response(HttpStatus.NOT_FOUND, "BLOG_ASSET_NOT_FOUND", "Blog image asset was not found.", List.of());
+    }
+
+    @ExceptionHandler(AiJobNotFoundException.class)
+    ResponseEntity<ApiErrorResponse> jobNotFound() {
+        return response(HttpStatus.NOT_FOUND, "AI_JOB_NOT_FOUND", "AI job was not found.", List.of());
+    }
+
+    @ExceptionHandler(InvalidAiJobOperationException.class)
+    ResponseEntity<ApiErrorResponse> invalidJobOperation(InvalidAiJobOperationException exception) {
+        return response(HttpStatus.CONFLICT, "INVALID_AI_JOB_OPERATION", exception.getMessage(), List.of());
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

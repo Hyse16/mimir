@@ -47,6 +47,41 @@ export type ImageVariant = {
   height: number;
 };
 
+export type ImageAnalysis = {
+  assetId: string;
+  displayOrder: number;
+  category: string;
+  description: string;
+  objects: string[];
+  visibleText: string | null;
+  analyzedAt: string;
+};
+
+export type ImageAnalysisItem = {
+  assetId: string;
+  displayOrder: number;
+  status: "WAITING" | "SUCCEEDED" | "FAILED";
+  errorCode: string | null;
+  analysis: ImageAnalysis | null;
+};
+
+export type AiJob = {
+  id: string;
+  blogPostId: string;
+  parentJobId: string | null;
+  jobType: "IMAGE_ANALYSIS";
+  status: "WAITING" | "RUNNING" | "COMPLETED" | "PARTIAL_FAILED" | "FAILED";
+  stage: "QUEUED" | "IMAGE_ANALYSIS" | "COMPLETE";
+  totalItems: number;
+  processedItems: number;
+  failedItems: number;
+  progress: number;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  items: ImageAnalysisItem[];
+};
+
 export type BlogPostDetail = BlogPostSummary & {
   visitContext: string;
   currentVersion: DraftVersion;
@@ -177,6 +212,40 @@ function isImageVariant(value: unknown): value is ImageVariant {
     typeof value.height === "number";
 }
 
+function isImageAnalysis(value: unknown): value is ImageAnalysis {
+  return isRecord(value) &&
+    typeof value.assetId === "string" &&
+    typeof value.displayOrder === "number" &&
+    typeof value.category === "string" &&
+    typeof value.description === "string" &&
+    Array.isArray(value.objects) && value.objects.every((item) => typeof item === "string") &&
+    (typeof value.visibleText === "string" || value.visibleText === null) &&
+    typeof value.analyzedAt === "string";
+}
+
+function isAiJob(value: unknown): value is AiJob {
+  if (!isRecord(value)) return false;
+  return typeof value.id === "string" &&
+    typeof value.blogPostId === "string" &&
+    (typeof value.parentJobId === "string" || value.parentJobId === null) &&
+    value.jobType === "IMAGE_ANALYSIS" &&
+    ["WAITING", "RUNNING", "COMPLETED", "PARTIAL_FAILED", "FAILED"].includes(String(value.status)) &&
+    ["QUEUED", "IMAGE_ANALYSIS", "COMPLETE"].includes(String(value.stage)) &&
+    typeof value.totalItems === "number" &&
+    typeof value.processedItems === "number" &&
+    typeof value.failedItems === "number" &&
+    typeof value.progress === "number" &&
+    typeof value.createdAt === "string" &&
+    (typeof value.startedAt === "string" || value.startedAt === null) &&
+    (typeof value.completedAt === "string" || value.completedAt === null) &&
+    Array.isArray(value.items) && value.items.every((item) => isRecord(item) &&
+      typeof item.assetId === "string" &&
+      typeof item.displayOrder === "number" &&
+      ["WAITING", "SUCCEEDED", "FAILED"].includes(String(item.status)) &&
+      (typeof item.errorCode === "string" || item.errorCode === null) &&
+      (item.analysis === null || isImageAnalysis(item.analysis)));
+}
+
 function isBlogPostPage(value: unknown): value is BlogPostPage {
   if (!isRecord(value)) return false;
   return (
@@ -299,4 +368,19 @@ export async function deleteBlogAsset(id: string, assetId: string): Promise<Blog
     "DELETE",
   );
   return Array.isArray(payload) && payload.every(isBlogAsset) ? payload : null;
+}
+
+export async function createImageAnalysisJob(postId: string): Promise<AiJob | null> {
+  const payload = await sendJson(`/blog-posts/${encodeURIComponent(postId)}/generation-jobs`, "POST");
+  return isAiJob(payload) ? payload : null;
+}
+
+export async function getAiJob(jobId: string): Promise<AiJob | null> {
+  const payload = await getJson(`/jobs/${encodeURIComponent(jobId)}`);
+  return isAiJob(payload) ? payload : null;
+}
+
+export async function retryFailedImageAnalysis(jobId: string): Promise<AiJob | null> {
+  const payload = await sendJson(`/jobs/${encodeURIComponent(jobId)}/retry-failed`, "POST");
+  return isAiJob(payload) ? payload : null;
 }

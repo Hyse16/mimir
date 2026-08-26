@@ -6,11 +6,13 @@ import {
   duplicateBlogPostAction,
   reorderBlogAssetsAction,
   saveBlogDraftAction,
+  startImageAnalysisAction,
+  retryImageAnalysisAction,
   updateBlogStatusAction,
 } from "@/app/blogs/actions";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmActionForm } from "@/components/confirm-action-form";
-import { BLOG_POST_STATUSES, getBlogPost } from "@/lib/mimir-api";
+import { BLOG_POST_STATUSES, getAiJob, getBlogPost } from "@/lib/mimir-api";
 
 export const dynamic = "force-dynamic";
 
@@ -21,14 +23,17 @@ type DetailPageProps = {
 
 export default async function BlogDetailPage({ params, searchParams }: DetailPageProps) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const post = await getBlogPost(id);
+  const jobId = single(query.jobId);
+  const [post, job] = await Promise.all([getBlogPost(id), jobId ? getAiJob(jobId) : null]);
   if (!post) notFound();
+  const selectedJob = job?.blogPostId === post.id ? job : null;
 
   const returnTo = safeReturnTo(single(query.returnTo));
   const archiveAction = archiveBlogPostAction.bind(null, post.id, returnTo);
   const duplicateAction = duplicateBlogPostAction.bind(null, post.id, returnTo);
   const saveAction = saveBlogDraftAction.bind(null, post.id, returnTo);
   const statusAction = updateBlogStatusAction.bind(null, post.id, returnTo);
+  const analysisAction = startImageAnalysisAction.bind(null, post.id, returnTo);
   const assetIds = post.assets.map((asset) => asset.id);
   const uploadAction = `/api/blog-posts/${encodeURIComponent(post.id)}/assets?returnTo=${encodeURIComponent(returnTo)}`;
   const notice = single(query.notice);
@@ -48,6 +53,8 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
       {notice === "asset-upload" && <p className="noticeBanner" role="status">이미지를 업로드했습니다.</p>}
       {notice === "asset-order" && <p className="noticeBanner" role="status">이미지 순서를 변경했습니다.</p>}
       {notice === "asset-delete" && <p className="noticeBanner" role="status">이미지를 삭제했습니다.</p>}
+      {notice === "analysis-start" && <p className="noticeBanner" role="status">이미지 분석 작업을 시작했습니다.</p>}
+      {notice === "analysis-retry" && <p className="noticeBanner" role="status">실패 이미지 재분석을 시작했습니다.</p>}
       {error && <p className="noticeBanner error" role="alert">요청을 처리하지 못했습니다. 백엔드 연결 상태를 확인해주세요.</p>}
 
       <section className="detailGrid">
@@ -63,6 +70,47 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
           <p>{post.visitContext || "등록된 사실 메모가 없습니다."}</p>
           <dl><div><dt>생성</dt><dd>{formatDate(post.createdAt)}</dd></div><div><dt>최근 수정</dt><dd>{formatDate(post.updatedAt)}</dd></div><div><dt>버전 수</dt><dd>{post.versions.length}개</dd></div></dl>
         </aside>
+      </section>
+
+      <section className="panel analysisPanel">
+        <div className="panelHeader">
+          <div><h2>이미지 분석</h2><p>분석용 파생본을 최대 3장씩 순차 처리하고 결과를 사진별로 저장합니다.</p></div>
+          <form action={analysisAction}>
+            <button
+              className="primaryButton"
+              disabled={post.assets.length === 0 || selectedJob?.status === "WAITING" || selectedJob?.status === "RUNNING"}
+              type="submit"
+            >{selectedJob?.status === "WAITING" || selectedJob?.status === "RUNNING" ? "분석 진행 중" : "전체 이미지 분석"}</button>
+          </form>
+        </div>
+        {selectedJob ? (
+          <>
+            <div className="jobSummary">
+              <div><strong>{jobStatusLabel(selectedJob.status)}</strong><small>{selectedJob.processedItems} 성공 · {selectedJob.failedItems} 실패 · 총 {selectedJob.totalItems}장</small></div>
+              <progress aria-label="이미지 분석 진행률" max={100} value={selectedJob.progress}>{selectedJob.progress}%</progress>
+              <Link className="actionButton" href={`/blogs/${encodeURIComponent(post.id)}?returnTo=${encodeURIComponent(returnTo)}&jobId=${encodeURIComponent(selectedJob.id)}`}>상태 새로고침</Link>
+              {(selectedJob.status === "PARTIAL_FAILED" || selectedJob.status === "FAILED") && (
+                <form action={retryImageAnalysisAction.bind(null, post.id, returnTo, selectedJob.id)}>
+                  <button className="actionButton" type="submit">실패 이미지 재분석</button>
+                </form>
+              )}
+            </div>
+            <ol className="analysisList">
+              {selectedJob.items.map((item) => (
+                <li key={item.assetId}>
+                  <span className="assetOrder">{item.displayOrder + 1}</span>
+                  <span>
+                    <strong>{analysisItemLabel(item.status, item.analysis?.category)}</strong>
+                    <small>{item.analysis?.description ?? item.errorCode ?? "분석 대기 중"}</small>
+                    {item.analysis && item.analysis.objects.length > 0 && <small>{item.analysis.objects.join(", ")}</small>}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </>
+        ) : (
+          <div className="emptyState"><h3>선택된 분석 작업이 없습니다</h3><p>이미지를 분석하면 진행 상태와 구조화 결과가 여기에 표시됩니다.</p></div>
+        )}
       </section>
 
       <section className="panel editPanel">
@@ -178,6 +226,22 @@ function statusLabel(status: string) {
     PUBLISHED: "게시 완료",
     ARCHIVED: "보관됨",
   } as Record<string, string>)[status] ?? status;
+}
+
+function jobStatusLabel(status: string) {
+  return ({
+    WAITING: "대기 중",
+    RUNNING: "분석 중",
+    COMPLETED: "분석 완료",
+    PARTIAL_FAILED: "일부 이미지 실패",
+    FAILED: "분석 실패",
+  } as Record<string, string>)[status] ?? status;
+}
+
+function analysisItemLabel(status: string, category: string | undefined) {
+  if (status === "SUCCEEDED") return category ? `분석 완료 · ${category}` : "분석 완료";
+  if (status === "FAILED") return "분석 실패";
+  return "분석 대기 중";
 }
 
 function formatBytes(bytes: number) {

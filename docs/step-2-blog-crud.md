@@ -46,6 +46,6 @@ Saving a version may include `visitContext`; the backend commits it with the new
 
 ## Remaining STEP 2 decisions
 
-- The STEP 2/3 `BlogAsset` boundary is resolved by introducing asset persistence, safe original storage, and ordering as the first STEP 3 slice. Optimization and analysis remain in STEP 3.
+- The STEP 2/3 `BlogAsset` boundary is resolved in STEP 3 with safe original storage, ordering, derivatives, and durable structured image-analysis jobs.
 - `develop.md` lists deletion confirmation, while the accepted API contract excludes destructive deletion from the first vertical slice. Archive is implemented and preserves version history; destructive deletion remains intentionally unavailable.
 - Browser-level automation is not installed. Current backoffice evidence is lint, TypeScript, production build, and backend integration coverage.

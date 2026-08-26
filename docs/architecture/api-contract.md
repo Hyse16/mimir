@@ -84,6 +84,8 @@ data: {"jobId":"01J...","status":"RUNNING","total":20,"processed":15,"failed":1,
 
 Events are resumable by event ID. The durable job record remains authoritative after reconnect. A subset of image failures produces `PARTIAL_FAILED`; successful image analysis remains available and only failed items are eligible for targeted retry.
 
+The current image-analysis slice implements job creation, durable polling, structured per-image results, and failed-item-only retry. Cancellation and resumable SSE delivery remain the next job-transport slice; clients currently refresh the durable `GET /jobs/{jobId}` representation.
+
 ## System status
 
 `GET /api/v1/system/status` returns component availability and privacy-safe metadata for Flet and the backoffice. It does not return credentials, filesystem paths containing user names, raw prompts, browser profiles, cookies, or provider payloads.

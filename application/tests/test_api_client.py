@@ -157,6 +157,52 @@ def test_uploads_images_as_multipart_assets() -> None:
     assert assets[0].analysis_image.width == 960
 
 
+def test_starts_and_reads_structured_image_analysis_job() -> None:
+    payload = {
+        "id": "job-1",
+        "blogPostId": "post-1",
+        "parentJobId": None,
+        "jobType": "IMAGE_ANALYSIS",
+        "status": "PARTIAL_FAILED",
+        "stage": "COMPLETE",
+        "totalItems": 2,
+        "processedItems": 1,
+        "failedItems": 1,
+        "progress": 100,
+        "createdAt": "2026-08-26T10:00:00Z",
+        "startedAt": "2026-08-26T10:00:01Z",
+        "completedAt": "2026-08-26T10:00:02Z",
+        "items": [{
+            "assetId": "asset-1",
+            "displayOrder": 0,
+            "status": "SUCCEEDED",
+            "errorCode": None,
+            "analysis": {
+                "assetId": "asset-1",
+                "displayOrder": 0,
+                "category": "food",
+                "description": "접시 위 케이크",
+                "objects": ["cake", "plate"],
+                "visibleText": None,
+                "analyzedAt": "2026-08-26T10:00:02Z",
+            },
+        }, {
+            "assetId": "asset-2",
+            "displayOrder": 1,
+            "status": "FAILED",
+            "errorCode": "VISION_PROVIDER_FAILED",
+            "analysis": None,
+        }],
+    }
+    with patch("mimir_application.api_client.urlopen", return_value=Response(json.dumps(payload).encode())) as request:
+        job = MimirApiClient("http://localhost:8080/api/v1").create_image_analysis_job("post-1")
+
+    assert request.call_args.args[0].full_url.endswith("/blog-posts/post-1/generation-jobs")
+    assert job.status == "PARTIAL_FAILED"
+    assert job.items[0].analysis is not None
+    assert job.items[0].analysis.objects == ("cake", "plate")
+
+
 def test_surfaces_backend_validation_message() -> None:
     error = HTTPError(
         "http://localhost:8080/api/v1/blog-posts",

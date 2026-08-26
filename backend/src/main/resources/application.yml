@@ -26,6 +26,11 @@ mimir:
     optimized-jpeg-quality: ${MIMIR_OPTIMIZED_IMAGE_JPEG_QUALITY:0.85}
     analysis-jpeg-quality: ${MIMIR_ANALYSIS_IMAGE_JPEG_QUALITY:0.80}
     max-pixels: ${MIMIR_IMAGE_MAX_PIXELS:40000000}
+  ai:
+    vision-batch-size: ${MIMIR_VISION_BATCH_SIZE:3}
+    ollama:
+      base-url: ${MIMIR_OLLAMA_BASE_URL:http://127.0.0.1:11434}
+      vision-model: ${MIMIR_OLLAMA_VISION_MODEL:gemma4:latest}
 
 management:
   endpoints:

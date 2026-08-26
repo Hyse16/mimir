@@ -41,6 +41,15 @@ public class LocalStorageProvider implements StorageProvider {
     }
 
     @Override
+    public byte[] read(String key) {
+        try {
+            return Files.readAllBytes(target(key));
+        } catch (IOException error) {
+            throw new StorageException("Unable to read image asset.", error);
+        }
+    }
+
+    @Override
     public void delete(String key) {
         try {
             Files.deleteIfExists(target(key));

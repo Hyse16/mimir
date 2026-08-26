@@ -44,6 +44,40 @@ class ImageVariant:
 
 
 @dataclass(frozen=True)
+class ImageAnalysis:
+    asset_id: str
+    display_order: int
+    category: str
+    description: str
+    objects: tuple[str, ...]
+    visible_text: str | None
+    analyzed_at: str
+
+
+@dataclass(frozen=True)
+class ImageAnalysisItem:
+    asset_id: str
+    display_order: int
+    status: str
+    error_code: str | None
+    analysis: ImageAnalysis | None
+
+
+@dataclass(frozen=True)
+class AiJob:
+    id: str
+    blog_post_id: str
+    parent_job_id: str | None
+    status: str
+    stage: str
+    total_items: int
+    processed_items: int
+    failed_items: int
+    progress: int
+    items: tuple[ImageAnalysisItem, ...]
+
+
+@dataclass(frozen=True)
 class BlogAsset:
     id: str
     display_order: int
@@ -204,6 +238,15 @@ class MimirApiClient:
         except (KeyError, TypeError, ValueError) as error:
             raise BackendUnavailableError("Mimir backend returned invalid image assets.") from error
 
+    def create_image_analysis_job(self, post_id: str) -> AiJob:
+        return self._ai_job(self._request("POST", f"/blog-posts/{post_id}/generation-jobs"))
+
+    def get_ai_job(self, job_id: str) -> AiJob:
+        return self._ai_job(self._request("GET", f"/jobs/{job_id}"))
+
+    def retry_failed_image_analysis(self, job_id: str) -> AiJob:
+        return self._ai_job(self._request("POST", f"/jobs/{job_id}/retry-failed"))
+
     def _request(
         self,
         method: str,
@@ -313,6 +356,52 @@ class MimirApiClient:
             byte_size=int(payload["byteSize"]),
             width=int(payload["width"]),
             height=int(payload["height"]),
+        )
+
+    @staticmethod
+    def _ai_job(payload: Any) -> AiJob:
+        if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+            raise BackendUnavailableError("Mimir backend returned an invalid AI job.")
+        try:
+            return AiJob(
+                id=str(payload["id"]),
+                blog_post_id=str(payload["blogPostId"]),
+                parent_job_id=str(payload["parentJobId"]) if payload["parentJobId"] is not None else None,
+                status=str(payload["status"]),
+                stage=str(payload["stage"]),
+                total_items=int(payload["totalItems"]),
+                processed_items=int(payload["processedItems"]),
+                failed_items=int(payload["failedItems"]),
+                progress=int(payload["progress"]),
+                items=tuple(MimirApiClient._analysis_item(item) for item in payload["items"]),
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise BackendUnavailableError("Mimir backend returned an invalid AI job.") from error
+
+    @staticmethod
+    def _analysis_item(payload: Any) -> ImageAnalysisItem:
+        if not isinstance(payload, dict):
+            raise TypeError
+        analysis = payload["analysis"]
+        parsed = None
+        if analysis is not None:
+            if not isinstance(analysis, dict) or not isinstance(analysis.get("objects"), list):
+                raise TypeError
+            parsed = ImageAnalysis(
+                asset_id=str(analysis["assetId"]),
+                display_order=int(analysis["displayOrder"]),
+                category=str(analysis["category"]),
+                description=str(analysis["description"]),
+                objects=tuple(str(value) for value in analysis["objects"]),
+                visible_text=str(analysis["visibleText"]) if analysis["visibleText"] is not None else None,
+                analyzed_at=str(analysis["analyzedAt"]),
+            )
+        return ImageAnalysisItem(
+            asset_id=str(payload["assetId"]),
+            display_order=int(payload["displayOrder"]),
+            status=str(payload["status"]),
+            error_code=str(payload["errorCode"]) if payload["errorCode"] is not None else None,
+            analysis=parsed,
         )
 
     @staticmethod

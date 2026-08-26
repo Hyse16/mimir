@@ -22,24 +22,38 @@ Blog posts can persist and manage up to 20 ordered image assets from both worksp
 - Aspect-ratio-preserving optimized JPEG derivatives (2048px default) and Vision analysis JPEG derivatives (1280px default)
 - Original and derivative dimensions, byte sizes, content types, processing status, and provider-abstracted storage keys
 - Coordinated original/derivative cleanup on upload rollback and asset deletion
+- Flyway `V5__create_image_analysis_jobs.sql` with durable jobs, per-asset attempts, and job-scoped structured result history
+- Provider-independent Vision Gateway with a loopback-only Ollama adapter and JSON Schema structured output
+- Configurable sequential Vision batches of 2–4 images (3 by default); 20 images are never sent in one request
+- Durable `COMPLETED`, `PARTIAL_FAILED`, and `FAILED` outcomes with failed-item-only retry jobs
+- Flet and backoffice controls for starting analysis, reading progress, viewing per-image results, and retrying failures
 
 ## API
 
 - `POST /api/v1/blog-posts/{postId}/assets` accepts multipart field `files`
 - `PUT /api/v1/blog-posts/{postId}/assets/order` accepts every current asset ID exactly once
 - `DELETE /api/v1/blog-posts/{postId}/assets/{assetId}` removes one asset and compacts order
+- `POST /api/v1/blog-posts/{postId}/generation-jobs` creates an asynchronous image-analysis job
+- `GET /api/v1/jobs/{jobId}` returns durable counts, progress, item states, and structured results
+- `POST /api/v1/jobs/{jobId}/retry-failed` creates a child job containing only failed items
 
 Defaults can be overridden with `MIMIR_STORAGE_LOCAL_ROOT`, `MIMIR_MAX_IMAGE_BYTES`, `MIMIR_OPTIMIZED_IMAGE_MAX_DIMENSION`, `MIMIR_ANALYSIS_IMAGE_MAX_DIMENSION`, `MIMIR_OPTIMIZED_IMAGE_JPEG_QUALITY`, `MIMIR_ANALYSIS_IMAGE_JPEG_QUALITY`, and `MIMIR_IMAGE_MAX_PIXELS`. Local runtime data remains ignored under `data/`.
 
-JPEG and PNG assets are decoded and receive both derivatives during upload. WebP originals remain accepted as `ORIGINAL_ONLY`; adding a portable WebP codec requires an explicitly approved dependency and is intentionally deferred.
+JPEG and PNG assets are decoded and receive both derivatives during upload. WebP originals remain accepted as `ORIGINAL_ONLY`; adding a portable WebP codec requires an explicitly approved dependency and is intentionally deferred. Vision uses `MIMIR_VISION_BATCH_SIZE` (2–4), `MIMIR_OLLAMA_BASE_URL` (loopback HTTP only), and `MIMIR_OLLAMA_VISION_MODEL` (`gemma4:latest` by default). Local Only rejects model identifiers containing `cloud` so a loopback Ollama daemon cannot be configured to relay this workflow to Ollama Cloud.
 
 ## Verification
 
-Backend integration tests use PostgreSQL/pgvector and temporary local storage. They cover 0, 1, 3, 10, and 20 images, rejection of image 21, MIME-signature mismatch, actual image decoding, bounded derivative dimensions, derivative storage and deletion, path-like filenames, complete ordering, deletion, and order compaction.
+Backend integration tests use PostgreSQL/pgvector and temporary local storage. They cover 0, 1, 3, 10, and 20 images, rejection of image 21, MIME-signature mismatch, actual image decoding, bounded derivative dimensions, derivative storage and deletion, path-like filenames, complete ordering, deletion, order compaction, 3+2 sequential Vision batches, partial failure, active-job exclusion, and failed-item-only retry. A contract test verifies Ollama base64 image requests, structured result mapping, and Local Only URL enforcement without contacting a model.
 
 The Python client tests verify multipart framing and asset response parsing. The Flet construction smoke test and Next.js lint, typecheck, and production build verify that image operations remain consumable across both clients.
 
 ## Remaining STEP 3 work
 
 - Portable WebP decoding and derivative generation
-- Structured per-image analysis, sequential vision batching, partial failure, and retry
+- Durable SSE progress events, reconnect/resume, and job cancellation
+- Live model quality and latency verification with representative personal images
+
+## Upstream contract references
+
+- [Ollama Vision](https://docs.ollama.com/capabilities/vision): REST image input is a base64-encoded `images` array
+- [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs): Vision responses accept a JSON Schema through `format`

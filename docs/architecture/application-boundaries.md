@@ -2,7 +2,7 @@
 
 Status: accepted for MVP implementation
 
-Last updated: 2026-08-20
+Last updated: 2026-08-26
 
 ## Product split
 

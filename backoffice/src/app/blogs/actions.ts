@@ -5,12 +5,30 @@ import { redirect } from "next/navigation";
 import {
   archiveBlogPost,
   BLOG_POST_STATUSES,
+  createImageAnalysisJob,
   deleteBlogAsset,
   duplicateBlogPost,
   reorderBlogAssets,
+  retryFailedImageAnalysis,
   saveBlogVersion,
   updateBlogPostStatus,
 } from "@/lib/mimir-api";
+
+export async function startImageAnalysisAction(postId: string, returnTo: string) {
+  const job = await createImageAnalysisJob(postId);
+  if (!job) redirect(detailHref(postId, returnTo, "error=analysis-start"));
+
+  revalidateBlog(postId);
+  redirect(detailHref(postId, returnTo, `notice=analysis-start&jobId=${encodeURIComponent(job.id)}`));
+}
+
+export async function retryImageAnalysisAction(postId: string, returnTo: string, jobId: string) {
+  const job = await retryFailedImageAnalysis(jobId);
+  if (!job) redirect(detailHref(postId, returnTo, "error=analysis-retry"));
+
+  revalidateBlog(postId);
+  redirect(detailHref(postId, returnTo, `notice=analysis-retry&jobId=${encodeURIComponent(job.id)}`));
+}
 
 export async function reorderBlogAssetsAction(
   postId: string,
