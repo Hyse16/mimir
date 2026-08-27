@@ -15,6 +15,9 @@ STEP 4 now has a provider-independent generation boundary, a durable asynchronou
 - Exact `{{IMAGE:n}}` validation: every supplied image must appear once in display order
 - Output length and tag boundary validation before business persistence
 - Context grounding checks for prices, waiting, taste, service, orders, revisit intent, and visit weekdays
+- Exact grounding for price values, Korean/ISO dates, weekdays, and numeric wait durations
+- Conservative rejection of unsupported taste, service, recommendation, atmosphere, comfort, and quality opinions
+- Prompt precedence that prevents revision instructions from overriding grounding rules
 - Local Only rejection for non-loopback URLs and model identifiers containing `cloud`
 - Flyway `V7__add_draft_generation_jobs.sql` with draft job inputs, result version, error code, and generation stages
 - Asynchronous `BLOG_DRAFT_GENERATION` jobs on the existing single local-AI executor and durable SSE event stream
@@ -49,9 +52,10 @@ Focused tests verify:
 - Non-loopback URLs and cloud model identifiers are rejected
 - PostgreSQL integration covers successful AI version creation, missing image analysis, stale base versions, provider failure, and cancellation after inference
 - Flet tests cover revision start, unsaved-edit blocking, cancellation, polling completion, first-save enablement, non-mutating comparison, and confirmed restoration
-- The exact production text prompt and JSON Schema passed a local `qwen2.5:7b` run in 15.00 seconds, including 5.55 seconds model load time
+- Validator regressions cover changed prices and weekdays, invented dates and wait durations, unsupported taste/recommendation/service/atmosphere claims, and equivalent Korean/ISO dates
+- Three production-contract `qwen2.5:7b` scenarios completed in 24.69 seconds with their expected grounding decisions
 
-The live evidence in `docs/evidence/step-4-text-gateway.json` confirms Korean structured output, ordered `{{IMAGE:1}}` and `{{IMAGE:2}}` placement, no unsupported price/wait/service/order claims, and completion within the three-minute Gateway timeout.
+The live evidence in `docs/evidence/step-4-text-gateway.json` confirms Korean structured output, two- and three-image placeholder order, exact grounded values, and completion within the three-minute Gateway timeout. The hostile sparse-context sample intentionally receives `REJECT`: `qwen2.5:7b` still follows an instruction to embellish unsupported atmosphere and quality, so the server-side validator remains a required defense rather than an optional fallback.
 
 Run the focused slice:
 
@@ -71,6 +75,7 @@ TEXT_RESULT_PATH=docs/evidence/step-4-text-gateway.json \
 
 ## Next STEP 4 slice
 
-- Expand live grounding regression samples before supporting freer conversational revision turns
+- Persist revision-turn instructions and outcomes so freer conversational editing has an auditable history
+- Add constrained partial-regeneration targets only after each target has its own grounding regression coverage
 
 The grounding validator is a deliberate defense layer, not a proof that every possible hallucination can be recognized. New unsupported-claim families found in live evaluation must become regression cases before expanding the generation surface.

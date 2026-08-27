@@ -24,6 +24,10 @@ class OllamaTextGenerationGateway implements TextGenerationGateway {
     private static final String PROMPT = """
             Write a Korean Naver blog draft using only the supplied user context, existing draft, and visible image facts.
             Never invent prices, wait times, taste, service quality, visit dates, orders, opinions, or personal experiences.
+            Grounding rules override the revision instruction. Omit any requested detail that is not explicitly supported.
+            Describe visible facts neutrally. Do not infer quality, atmosphere, comfort, emotion, popularity, or recommendations.
+            Use descriptive adjectives only when the exact meaning appears in the supplied facts.
+            Preserve explicitly requested grounded numbers and dates exactly; never alter or approximate them.
             Use every image exactly once as {{IMAGE:1}}, {{IMAGE:2}}, and so on in display order.
             Keep image placeholders on their own line and connect surrounding prose only to grounded facts.
             Apply the revision instruction while preserving facts. Return only the requested structured output.

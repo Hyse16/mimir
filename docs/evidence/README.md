@@ -9,6 +9,6 @@ This directory stores reproducible machine-generated summaries from local-only v
 - `step-0-text-long-form.json` — repeated long-form Korean Naver blog generation sample
 - `step-0-hermes-memory-write.json` — current Hermes Memory tool-call attempt; not a passing artifact until a pending or committed record is independently verified
 - `step-3-vision-gateway.json` — live `gemma4:latest` result using the production Gateway prompt and schema against three non-sensitive representative fixtures
-- `step-4-text-gateway.json` — live `qwen2.5:7b` structured draft using the production prompt, grounded context, and ordered image placeholders
+- `step-4-text-gateway.json` — three live `qwen2.5:7b` grounding scenarios using the production prompt and schema: hostile sparse context (expected rejection), exact grounded facts, and three-image ordering
 
 The vision count runs cycle three known fixtures to validate batching, order, structured output, and throughput. They do not replace later accuracy tests with 10 and 20 distinct representative blog photos.

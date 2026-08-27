@@ -41,6 +41,7 @@ class OllamaTextGenerationGatewayTest {
                 .andExpect(method(POST))
                 .andExpect(content().string(containsString("INPUT_JSON")))
                 .andExpect(content().string(containsString("확인된 방문 사실")))
+                .andExpect(content().string(containsString("Grounding rules override the revision instruction")))
                 .andExpect(content().string(containsString("{{IMAGE:1}}")))
                 .andExpect(content().string(containsString("\"format\"")))
                 .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
