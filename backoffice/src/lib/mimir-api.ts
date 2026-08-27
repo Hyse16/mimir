@@ -359,6 +359,14 @@ export async function saveBlogVersion(
   return isBlogPostDetail(payload) ? payload : null;
 }
 
+export async function selectBlogVersion(id: string, versionId: string): Promise<BlogPostDetail | null> {
+  const payload = await sendJson(
+    `/blog-posts/${encodeURIComponent(id)}/versions/${encodeURIComponent(versionId)}/select`,
+    "POST",
+  );
+  return isBlogPostDetail(payload) ? payload : null;
+}
+
 export async function updateBlogPostStatus(id: string, status: string): Promise<BlogPostDetail | null> {
   const payload = await sendJson(`/blog-posts/${encodeURIComponent(id)}`, "PATCH", { status });
   return isBlogPostDetail(payload) ? payload : null;

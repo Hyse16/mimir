@@ -52,8 +52,13 @@ def version(number: int, *, selected: bool = True) -> DraftVersion:
     )
 
 
-def post(number: int) -> BlogPostDetail:
+def post(number: int, *, total_versions: int | None = None) -> BlogPostDetail:
+    total = total_versions or number
     current = version(number)
+    versions = tuple(
+        version(candidate, selected=candidate == number)
+        for candidate in range(total, 0, -1)
+    )
     return BlogPostDetail(
         id="post-1",
         title=current.title,
@@ -63,7 +68,7 @@ def post(number: int) -> BlogPostDetail:
         created_at="2026-08-27T10:00:00Z",
         updated_at="2026-08-27T10:00:00Z",
         current_version=current,
-        versions=(current,),
+        versions=versions,
         assets=(),
     )
 
@@ -90,6 +95,7 @@ def job(status: str, stage: str, *, result_version_id: str | None = None) -> AiJ
 class FakeApiClient:
     def __init__(self) -> None:
         self.created_with: tuple[str, str, str] | None = None
+        self.selected_version_id: str | None = None
         self.detail = post(1)
         self.polled_job = job("COMPLETED", "COMPLETE", result_version_id="version-2")
 
@@ -111,6 +117,11 @@ class FakeApiClient:
 
     def cancel_ai_job(self, _: str) -> AiJob:
         return job("CANCEL_REQUESTED", "QUEUED")
+
+    def select_blog_version(self, _: str, version_id: str) -> BlogPostDetail:
+        self.selected_version_id = version_id
+        self.detail = post(1, total_versions=2)
+        return self.detail
 
 
 def load_post(page: FakePage, client: FakeApiClient) -> Any:
@@ -187,3 +198,37 @@ def test_enables_revision_after_first_draft_is_saved() -> None:
 
     assert find_control(root, key="revision-instruction").disabled is False
     assert find_control(root, key="start-revision").disabled is False
+
+
+def test_compares_versions_without_changing_the_selected_version() -> None:
+    page = FakePage()
+    client = FakeApiClient()
+    client.detail = post(2)
+    root = load_post(page, client)
+
+    find_control(root, key="compare-versions").on_click(None)
+
+    comparison = find_control(root, key="version-comparison").value
+    assert "--- v1" in comparison
+    assert "+++ v2" in comparison
+    assert client.selected_version_id is None
+
+
+def test_restores_version_only_after_explicit_confirmation() -> None:
+    page = FakePage()
+    client = FakeApiClient()
+    client.detail = post(2)
+    root = load_post(page, client)
+    restore_button = find_control(root, key="restore-version")
+
+    restore_button.on_click(None)
+    assert client.selected_version_id is None
+
+    confirmation = find_control(root, key="confirm-version-restore")
+    confirmation.value = True
+    confirmation.on_change(None)
+    restore_button.on_click(None)
+
+    assert client.selected_version_id == "version-1"
+    assert find_control(root, key="blog-body").value == "본문 1"
+    assert "현재 초안으로 복원" in find_control(root, key="version-status").value

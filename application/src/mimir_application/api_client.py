@@ -205,6 +205,13 @@ class MimirApiClient:
         )
         return self._blog_post_detail(payload)
 
+    def select_blog_version(self, post_id: str, version_id: str) -> BlogPostDetail:
+        payload = self._request(
+            "POST",
+            f"/blog-posts/{post_id}/versions/{version_id}/select",
+        )
+        return self._blog_post_detail(payload)
+
     def upload_blog_assets(
         self,
         post_id: str,

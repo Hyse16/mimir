@@ -1,4 +1,5 @@
 import mimetypes
+from difflib import unified_diff
 
 import flet as ft
 
@@ -7,6 +8,7 @@ from mimir_application.api_client import (
     ApiRequestError,
     BackendUnavailableError,
     BlogPostDetail,
+    DraftVersion,
     ImageUpload,
     MimirApiClient,
 )
@@ -96,6 +98,46 @@ def build_app(
     revision_cancel_button = ft.OutlinedButton(
         "수정 취소", icon=ft.Icons.CANCEL_OUTLINED, disabled=True, key="cancel-revision"
     )
+    version_before_selector = ft.Dropdown(
+        label="복원 후보 / 이전 버전",
+        disabled=True,
+        expand=True,
+        key="compare-version-before",
+    )
+    version_after_selector = ft.Dropdown(
+        label="이후 버전",
+        disabled=True,
+        expand=True,
+        key="compare-version-after",
+    )
+    compare_button = ft.OutlinedButton(
+        "두 버전 비교", icon=ft.Icons.COMPARE_ARROWS, disabled=True, key="compare-versions"
+    )
+    comparison_text = ft.TextField(
+        label="버전 차이",
+        value="비교할 버전이 아직 없습니다.",
+        multiline=True,
+        min_lines=5,
+        max_lines=14,
+        read_only=True,
+        key="version-comparison",
+    )
+    restore_confirmation = ft.Checkbox(
+        label="선택 상태가 변경되는 것을 확인했습니다.",
+        disabled=True,
+        key="confirm-version-restore",
+    )
+    restore_button = ft.FilledButton(
+        "선택 버전을 현재로 복원",
+        icon=ft.Icons.RESTORE,
+        disabled=True,
+        key="restore-version",
+    )
+    version_text = ft.Text(
+        "비교는 조회만 수행하며 복원 버튼만 현재 버전을 변경합니다.",
+        color="#5B6470",
+        key="version-status",
+    )
 
     def refresh_status(_: ft.ControlEvent | None = None) -> None:
         try:
@@ -146,6 +188,37 @@ def build_app(
         revision_cancel_button.disabled = True
         revision_text.value = "현재 선택된 버전을 기준으로 새 AI 버전을 생성합니다. 저장하지 않은 편집은 먼저 저장해주세요."
         revision_text.color = "#5B6470"
+        def version_options():
+            return [
+                ft.DropdownOption(
+                    key=version.id,
+                    text=f"v{version.version_number} · {version.title} · {version.source}",
+                )
+                for version in post.versions
+            ]
+
+        version_before_selector.options = version_options()
+        version_after_selector.options = version_options()
+        comparison_version = next(
+            (version for version in post.versions if not version.selected),
+            post.current_version,
+        )
+        version_before_selector.value = comparison_version.id
+        version_after_selector.value = post.current_version_id
+        has_history = len(post.versions) > 1
+        version_before_selector.disabled = not has_history
+        version_after_selector.disabled = not has_history
+        compare_button.disabled = not has_history
+        comparison_text.value = (
+            "두 버전을 선택하고 비교해주세요."
+            if has_history
+            else "비교할 이전 버전이 없습니다."
+        )
+        restore_confirmation.value = False
+        restore_confirmation.disabled = not has_history
+        restore_button.disabled = True
+        version_text.value = "비교는 조회만 수행하며 복원 버튼만 현재 버전을 변경합니다."
+        version_text.color = "#5B6470"
 
     def show_analysis_job(job: AiJob) -> None:
         nonlocal current_analysis_job
@@ -241,6 +314,19 @@ def build_app(
         revision_cancel_button.disabled = True
         revision_text.value = "게시글과 이미지 분석을 준비한 뒤 로컬 AI에 수정을 요청할 수 있습니다."
         revision_text.color = "#5B6470"
+        version_before_selector.options = []
+        version_after_selector.options = []
+        version_before_selector.value = None
+        version_after_selector.value = None
+        version_before_selector.disabled = True
+        version_after_selector.disabled = True
+        compare_button.disabled = True
+        comparison_text.value = "비교할 버전이 아직 없습니다."
+        restore_confirmation.value = False
+        restore_confirmation.disabled = True
+        restore_button.disabled = True
+        version_text.value = "비교는 조회만 수행하며 복원 버튼만 현재 버전을 변경합니다."
+        version_text.color = "#5B6470"
         page.update()
 
     async def pick_images(_: ft.ControlEvent) -> None:
@@ -441,6 +527,81 @@ def build_app(
     revision_refresh_button.on_click = refresh_revision
     revision_cancel_button.on_click = cancel_revision
 
+    def selected_version(version_id: str | None) -> DraftVersion | None:
+        if current_post is None or version_id is None:
+            return None
+        return next((version for version in current_post.versions if version.id == version_id), None)
+
+    def compare_versions(_: ft.ControlEvent) -> None:
+        before = selected_version(version_before_selector.value)
+        after = selected_version(version_after_selector.value)
+        if before is None or after is None:
+            version_text.value = "비교할 두 버전을 선택해주세요."
+            version_text.color = "#B42318"
+            page.update()
+            return
+        before_lines = version_document(before)
+        after_lines = version_document(after)
+        differences = list(
+            unified_diff(
+                before_lines,
+                after_lines,
+                fromfile=f"v{before.version_number}",
+                tofile=f"v{after.version_number}",
+                lineterm="",
+            )
+        )
+        comparison_text.value = "\n".join(differences) if differences else "선택한 두 버전의 내용이 같습니다."
+        version_text.value = f"v{before.version_number}과 v{after.version_number} 비교 결과입니다. 현재 선택 버전은 변경되지 않았습니다."
+        version_text.color = "#16803C"
+        restore_confirmation.value = False
+        restore_button.disabled = True
+        page.update()
+
+    def confirm_restore(_: ft.ControlEvent) -> None:
+        candidate = selected_version(version_before_selector.value)
+        restore_button.disabled = not (
+            restore_confirmation.value
+            and candidate is not None
+            and current_post is not None
+            and candidate.id != current_post.current_version_id
+        )
+        page.update()
+
+    def restore_version(_: ft.ControlEvent) -> None:
+        nonlocal current_post
+        candidate = selected_version(version_before_selector.value)
+        if (
+            current_post is None
+            or candidate is None
+            or candidate.id == current_post.current_version_id
+            or not restore_confirmation.value
+        ):
+            version_text.value = "이전 버전을 선택하고 복원 확인을 체크해주세요."
+            version_text.color = "#B42318"
+            page.update()
+            return
+        restore_button.disabled = True
+        version_text.value = f"v{candidate.version_number} 복원 중…"
+        version_text.color = "#5B6470"
+        page.update()
+        try:
+            current_post = client.select_blog_version(current_post.id, candidate.id)
+            show_post(current_post)
+            version_text.value = f"v{current_post.current_version.version_number}을 현재 초안으로 복원했습니다."
+            version_text.color = "#16803C"
+        except ApiRequestError as error:
+            version_text.value = f"버전 복원 실패: {error}"
+            version_text.color = "#B42318"
+        except BackendUnavailableError:
+            version_text.value = "버전 복원 실패: 업무 서버에 연결할 수 없습니다."
+            version_text.color = "#B42318"
+        page.update()
+
+    compare_button.on_click = compare_versions
+    restore_confirmation.on_change = confirm_restore
+    restore_button.on_click = restore_version
+
     def save_draft(_: ft.ControlEvent) -> None:
         nonlocal current_post
         title = (title_field.value or "").strip()
@@ -634,12 +795,43 @@ def build_app(
                     ),
                 ),
                 ft.Container(height=12),
+                ft.Container(
+                    bgcolor="#FFFFFF",
+                    border_radius=16,
+                    padding=24,
+                    content=ft.Column(
+                        controls=[
+                            ft.Text("버전 비교와 복원", size=18, weight=ft.FontWeight.W_600),
+                            ft.Text(
+                                "비교 결과를 확인한 뒤에만 이전 버전을 현재 초안으로 복원할 수 있습니다.",
+                                color="#5B6470",
+                            ),
+                            ft.Row(controls=[version_before_selector, version_after_selector, compare_button]),
+                            comparison_text,
+                            version_text,
+                            ft.Row(
+                                alignment=ft.MainAxisAlignment.END,
+                                controls=[restore_confirmation, restore_button],
+                            ),
+                        ]
+                    ),
+                ),
+                ft.Container(height=12),
                 ft.Row(spacing=8, controls=[status_icon, status_text]),
             ],
         ),
     )
 
     page.add(ft.Row(spacing=0, controls=[sidebar, content], expand=True))
+
+
+def version_document(version: DraftVersion) -> list[str]:
+    return [
+        f"제목: {version.title}",
+        f"태그: {', '.join(version.tags)}",
+        "본문:",
+        *version.body.splitlines(),
+    ]
 
 
 def run() -> None:

@@ -4,7 +4,7 @@ Last verified: 2026-08-27 (Asia/Seoul)
 
 ## Current slice
 
-STEP 4 now has a provider-independent generation boundary and a durable asynchronous path from a selected draft to a new AI-generated version.
+STEP 4 now has a provider-independent generation boundary, a durable asynchronous revision path, and explicit comparison and restoration workflows in both user interfaces.
 
 ## Delivered
 
@@ -24,12 +24,16 @@ STEP 4 now has a provider-independent generation boundary and a durable asynchro
 - Backoffice revision instruction, live progress, cancellation, terminal refresh, and error-code display
 - Flet revision workspace with instruction validation, unsaved-edit protection, polling, cancellation, and completed-version reload
 - Python API client support for starting, polling, and cancelling draft-generation jobs
+- Flet unified version diff that never changes the selected version during comparison
+- Backoffice side-by-side version comparison with changed-field summary and direct history shortcuts
+- Deliberate restore controls: Flet requires an explicit confirmation checkbox and Backoffice uses a confirmation dialog
 - Server-owned draft source: user version requests always create `USER_EDIT`, while only the generation service creates `AI_GENERATED`
 
 ## Database and API impact
 
 - Database: append-only V7 migration extends `ai_jobs` and `ai_job_events`; existing rows remain valid
 - API: `POST /api/v1/blog-posts/{postId}/draft-generation-jobs`
+- Existing API reused for restoration: `POST /api/v1/blog-posts/{postId}/versions/{versionId}/select`
 - Shared job responses now expose nullable `baseVersionId`, `resultVersionId`, and `errorCode`
 - Existing image-analysis endpoints and event-resume behavior are unchanged
 
@@ -44,7 +48,7 @@ Focused tests verify:
 - Prices and personal experiences absent from user context are rejected
 - Non-loopback URLs and cloud model identifiers are rejected
 - PostgreSQL integration covers successful AI version creation, missing image analysis, stale base versions, provider failure, and cancellation after inference
-- Flet tests cover revision start, unsaved-edit blocking, cancellation, polling completion, and first-save enablement
+- Flet tests cover revision start, unsaved-edit blocking, cancellation, polling completion, first-save enablement, non-mutating comparison, and confirmed restoration
 - The exact production text prompt and JSON Schema passed a local `qwen2.5:7b` run in 15.00 seconds, including 5.55 seconds model load time
 
 The live evidence in `docs/evidence/step-4-text-gateway.json` confirms Korean structured output, ordered `{{IMAGE:1}}` and `{{IMAGE:2}}` placement, no unsupported price/wait/service/order claims, and completion within the three-minute Gateway timeout.
@@ -67,8 +71,6 @@ TEXT_RESULT_PATH=docs/evidence/step-4-text-gateway.json \
 
 ## Next STEP 4 slice
 
-- Add version-to-version comparison in both workspaces
-- Add a deliberate restore action distinct from merely viewing an older version
 - Expand live grounding regression samples before supporting freer conversational revision turns
 
 The grounding validator is a deliberate defense layer, not a proof that every possible hallucination can be recognized. New unsupported-claim families found in live evaluation must become regression cases before expanding the generation surface.

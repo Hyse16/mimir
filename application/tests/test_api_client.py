@@ -107,6 +107,18 @@ def test_adds_version_against_current_base_version() -> None:
     assert post.current_version.version_number == 2
 
 
+def test_selects_an_existing_blog_version() -> None:
+    with patch("mimir_application.api_client.urlopen", return_value=blog_response()) as request:
+        post = MimirApiClient("http://localhost:8080/api/v1").select_blog_version(
+            "post-1", "version-1"
+        )
+
+    sent = request.call_args.args[0]
+    assert sent.full_url.endswith("/blog-posts/post-1/versions/version-1/select")
+    assert sent.method == "POST"
+    assert post.current_version.id == "version-1"
+
+
 def test_lists_recent_blog_posts() -> None:
     detail = json.load(blog_response())
     summary = {key: detail[key] for key in ("id", "title", "status", "currentVersionId", "createdAt", "updatedAt")}

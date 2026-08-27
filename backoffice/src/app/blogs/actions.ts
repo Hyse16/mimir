@@ -13,6 +13,7 @@ import {
   reorderBlogAssets,
   retryFailedImageAnalysis,
   saveBlogVersion,
+  selectBlogVersion,
   updateBlogPostStatus,
 } from "@/lib/mimir-api";
 
@@ -101,6 +102,18 @@ export async function updateBlogStatusAction(postId: string, returnTo: string, f
 
   revalidateBlog(postId);
   redirect(detailHref(postId, returnTo, "notice=status"));
+}
+
+export async function restoreBlogVersionAction(
+  postId: string,
+  returnTo: string,
+  versionId: string,
+) {
+  const post = await selectBlogVersion(postId, versionId);
+  if (!post) redirect(detailHref(postId, returnTo, "error=version-restore"));
+
+  revalidateBlog(postId);
+  redirect(detailHref(postId, returnTo, "notice=version-restored"));
 }
 
 export async function archiveBlogPostAction(postId: string, returnTo: string) {

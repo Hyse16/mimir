@@ -10,12 +10,13 @@ import {
   startImageAnalysisAction,
   cancelImageAnalysisAction,
   retryImageAnalysisAction,
+  restoreBlogVersionAction,
   updateBlogStatusAction,
 } from "@/app/blogs/actions";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmActionForm } from "@/components/confirm-action-form";
 import { JobLiveProgress } from "@/components/job-live-progress";
-import { BLOG_POST_STATUSES, getAiJob, getBlogPost } from "@/lib/mimir-api";
+import { BLOG_POST_STATUSES, getAiJob, getBlogPost, type DraftVersion } from "@/lib/mimir-api";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,16 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
   const selectedJob = job?.blogPostId === post.id ? job : null;
   const selectedImageJob = selectedJob?.jobType === "IMAGE_ANALYSIS" ? selectedJob : null;
   const selectedDraftJob = selectedJob?.jobType === "BLOG_DRAFT_GENERATION" ? selectedJob : null;
+  const comparisonBefore = versionForComparison(
+    post.versions,
+    single(query.compareFrom),
+    post.versions.find((version) => !version.selected) ?? post.currentVersion,
+  );
+  const comparisonAfter = versionForComparison(
+    post.versions,
+    single(query.compareTo),
+    post.currentVersion,
+  );
 
   const returnTo = safeReturnTo(single(query.returnTo));
   const archiveAction = archiveBlogPostAction.bind(null, post.id, returnTo);
@@ -63,6 +74,7 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
       {notice === "analysis-retry" && <p className="noticeBanner" role="status">실패 이미지 재분석을 시작했습니다.</p>}
       {notice === "analysis-cancel" && <p className="noticeBanner" role="status">이미지 분석 취소를 요청했습니다.</p>}
       {notice === "draft-generation-start" && <p className="noticeBanner" role="status">로컬 AI 초안 생성 작업을 시작했습니다.</p>}
+      {notice === "version-restored" && <p className="noticeBanner" role="status">선택한 이전 버전을 현재 초안으로 복원했습니다.</p>}
       {error && <p className="noticeBanner error" role="alert">요청을 처리하지 못했습니다. 백엔드 연결 상태를 확인해주세요.</p>}
 
       <section className="detailGrid">
@@ -249,12 +261,51 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
       </section>
 
       <section className="panel historyPanel">
-        <div className="panelHeader"><div><h2>버전 이력</h2><p>기존 버전은 삭제하거나 덮어쓰지 않습니다.</p></div></div>
+        <div className="panelHeader"><div><h2>버전 비교</h2><p>두 버전을 조회해도 현재 선택 버전은 바뀌지 않습니다.</p></div></div>
+        <form className="versionCompareForm" method="get">
+          <input name="returnTo" type="hidden" value={returnTo} />
+          <label>
+            <span>이전 버전</span>
+            <select defaultValue={comparisonBefore.id} name="compareFrom">
+              {post.versions.map((version) => <option key={version.id} value={version.id}>v{version.versionNumber} · {version.title}</option>)}
+            </select>
+          </label>
+          <label>
+            <span>이후 버전</span>
+            <select defaultValue={comparisonAfter.id} name="compareTo">
+              {post.versions.map((version) => <option key={version.id} value={version.id}>v{version.versionNumber} · {version.title}</option>)}
+            </select>
+          </label>
+          <button className="actionButton" type="submit">두 버전 비교</button>
+        </form>
+        <div className="versionComparison">
+          <VersionPreview label="이전" version={comparisonBefore} />
+          <VersionPreview label="이후" version={comparisonAfter} />
+        </div>
+        <p className="comparisonSummary">{comparisonSummary(comparisonBefore, comparisonAfter)}</p>
+      </section>
+
+      <section className="panel historyPanel">
+        <div className="panelHeader"><div><h2>버전 이력과 복원</h2><p>비교는 조회만 수행하며, 복원 버튼만 현재 초안을 변경합니다.</p></div></div>
         <ol className="versionList">
           {post.versions.map((version) => (
             <li key={version.id}>
               <div><strong>v{version.versionNumber} · {version.title}</strong><small>{formatDate(version.createdAt)} · {version.source}</small></div>
-              {version.selected && <span className="selectedBadge">현재 선택</span>}
+              <div className="versionActions">
+                <Link
+                  className="actionButton"
+                  href={comparisonHref(post.id, returnTo, version.id, post.currentVersionId)}
+                >현재 버전과 비교</Link>
+                {version.selected ? (
+                  <span className="selectedBadge">현재 선택</span>
+                ) : (
+                  <ConfirmActionForm
+                    action={restoreBlogVersionAction.bind(null, post.id, returnTo, version.id)}
+                    label="이 버전 복원"
+                    message={`v${version.versionNumber}을 현재 초안으로 복원할까요? 새 버전을 만들지 않고 선택 상태만 변경됩니다.`}
+                  />
+                )}
+              </div>
             </li>
           ))}
         </ol>
@@ -265,6 +316,36 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
 
 function single(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function versionForComparison(versions: DraftVersion[], id: string | undefined, fallback: DraftVersion) {
+  return versions.find((version) => version.id === id) ?? fallback;
+}
+
+function comparisonHref(postId: string, returnTo: string, beforeId: string, afterId: string) {
+  const params = new URLSearchParams({ returnTo, compareFrom: beforeId, compareTo: afterId });
+  return `/blogs/${encodeURIComponent(postId)}?${params.toString()}`;
+}
+
+function VersionPreview({ label, version }: { label: string; version: DraftVersion }) {
+  return (
+    <article className="versionPreview">
+      <div><span>{label}</span><strong>v{version.versionNumber} · {version.source}</strong></div>
+      <h3>{version.title}</h3>
+      <pre>{version.body || "본문이 비어 있습니다."}</pre>
+      <p>{version.tags.length > 0 ? version.tags.map((tag) => `#${tag}`).join(" ") : "태그 없음"}</p>
+    </article>
+  );
+}
+
+function comparisonSummary(before: DraftVersion, after: DraftVersion) {
+  if (before.id === after.id) return "같은 버전을 선택했습니다.";
+  const changed = [
+    before.title !== after.title ? "제목" : null,
+    before.body !== after.body ? "본문" : null,
+    before.tags.join("\u0000") !== after.tags.join("\u0000") ? "태그" : null,
+  ].filter(Boolean);
+  return changed.length > 0 ? `변경된 항목: ${changed.join(", ")}` : "제목, 본문, 태그 내용이 같습니다.";
 }
 
 function safeReturnTo(value: string | undefined) {

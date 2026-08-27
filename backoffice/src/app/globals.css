@@ -779,6 +779,84 @@ h1 {
   list-style: none;
 }
 
+.versionCompareForm {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin: 20px 0;
+}
+
+.versionCompareForm label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.versionCompareForm select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.versionComparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.versionPreview {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+.versionPreview > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.versionPreview h3 {
+  margin: 18px 0 10px;
+}
+
+.versionPreview pre {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font: inherit;
+  line-height: 1.7;
+}
+
+.versionPreview p,
+.comparisonSummary {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.comparisonSummary {
+  margin-top: 14px;
+  font-weight: 700;
+}
+
+.versionActions {
+  display: flex !important;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 8px !important;
+}
+
 .versionList li {
   display: flex;
   align-items: center;
@@ -827,6 +905,11 @@ h1 {
 
   .content {
     padding: 24px 18px;
+  }
+
+  .versionCompareForm,
+  .versionComparison {
+    grid-template-columns: 1fr;
   }
 
   .summaryGrid {
