@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,6 +82,23 @@ class DraftGenerationJobService {
                 UUID.randomUUID(), postId, baseVersionId, revisionInstruction.strip(), now));
         recordEvent(job, now);
         return job.getId();
+    }
+
+    @Transactional(readOnly = true)
+    public DraftGenerationApiModels.DraftRevisionTurnPageResponse history(UUID postId, int page, int size) {
+        if (!postRepository.existsById(postId)) {
+            throw new BlogNotFoundException(postId);
+        }
+        var turns = jobRepository.findByBlogPostIdAndJobTypeOrderByCreatedAtDesc(
+                postId,
+                AiJobType.BLOG_DRAFT_GENERATION,
+                PageRequest.of(page, size));
+        return new DraftGenerationApiModels.DraftRevisionTurnPageResponse(
+                turns.getContent().stream().map(this::turnResponse).toList(),
+                turns.getNumber(),
+                turns.getSize(),
+                turns.getTotalElements(),
+                turns.getTotalPages());
     }
 
     @Transactional
@@ -236,5 +254,19 @@ class DraftGenerationJobService {
 
     private void recordEvent(AiJobEntity job, Instant now) {
         eventRepository.save(new AiJobEventEntity(job, now));
+    }
+
+    private DraftGenerationApiModels.DraftRevisionTurnResponse turnResponse(AiJobEntity job) {
+        return new DraftGenerationApiModels.DraftRevisionTurnResponse(
+                job.getId(),
+                job.getStatus(),
+                job.getStage(),
+                job.getBaseVersionId(),
+                job.getResultVersionId(),
+                job.getRevisionInstruction(),
+                job.getErrorCode(),
+                job.getCreatedAt(),
+                job.getStartedAt(),
+                job.getCompletedAt());
     }
 }

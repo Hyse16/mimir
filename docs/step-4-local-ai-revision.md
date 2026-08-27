@@ -30,6 +30,8 @@ STEP 4 now has a provider-independent generation boundary, a durable asynchronou
 - Flet unified version diff that never changes the selected version during comparison
 - Backoffice side-by-side version comparison with changed-field summary and direct history shortcuts
 - Deliberate restore controls: Flet requires an explicit confirmation checkbox and Backoffice uses a confirmation dialog
+- Paginated PostgreSQL-backed revision-turn history with instruction, base/result version, outcome, error code, and timestamps
+- Flet and Backoffice audit views that show revision outcomes without exposing internal job IDs
 - Server-owned draft source: user version requests always create `USER_EDIT`, while only the generation service creates `AI_GENERATED`
 
 ## Database and API impact
@@ -37,6 +39,7 @@ STEP 4 now has a provider-independent generation boundary, a durable asynchronou
 - Database: append-only V7 migration extends `ai_jobs` and `ai_job_events`; existing rows remain valid
 - API: `POST /api/v1/blog-posts/{postId}/draft-generation-jobs`
 - Existing API reused for restoration: `POST /api/v1/blog-posts/{postId}/versions/{versionId}/select`
+- API: `GET /api/v1/blog-posts/{postId}/draft-generation-jobs?page=0&size=20`
 - Shared job responses now expose nullable `baseVersionId`, `resultVersionId`, and `errorCode`
 - Existing image-analysis endpoints and event-resume behavior are unchanged
 
@@ -53,6 +56,8 @@ Focused tests verify:
 - PostgreSQL integration covers successful AI version creation, missing image analysis, stale base versions, provider failure, and cancellation after inference
 - Flet tests cover revision start, unsaved-edit blocking, cancellation, polling completion, first-save enablement, non-mutating comparison, and confirmed restoration
 - Validator regressions cover changed prices and weekdays, invented dates and wait durations, unsupported taste/recommendation/service/atmosphere claims, and equivalent Korean/ISO dates
+- PostgreSQL integration verifies revision turns remain newest-first with completed and failed outcomes
+- Flet API/UI tests verify revision instructions and outcomes are visible without rendering internal job IDs
 - Three production-contract `qwen2.5:7b` scenarios completed in 24.69 seconds with their expected grounding decisions
 
 The live evidence in `docs/evidence/step-4-text-gateway.json` confirms Korean structured output, two- and three-image placeholder order, exact grounded values, and completion within the three-minute Gateway timeout. The hostile sparse-context sample intentionally receives `REJECT`: `qwen2.5:7b` still follows an instruction to embellish unsupported atmosphere and quality, so the server-side validator remains a required defense rather than an optional fallback.
@@ -75,7 +80,6 @@ TEXT_RESULT_PATH=docs/evidence/step-4-text-gateway.json \
 
 ## Next STEP 4 slice
 
-- Persist revision-turn instructions and outcomes so freer conversational editing has an auditable history
 - Add constrained partial-regeneration targets only after each target has its own grounding regression coverage
 
 The grounding validator is a deliberate defense layer, not a proof that every possible hallucination can be recognized. New unsupported-claim families found in live evaluation must become regression cases before expanding the generation surface.

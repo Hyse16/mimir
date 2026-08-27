@@ -32,4 +32,8 @@ class DraftGenerationJobCoordinator {
         taskExecutor.execute(() -> runner.run(jobId));
         return queryService.detail(jobId);
     }
+
+    DraftGenerationApiModels.DraftRevisionTurnPageResponse history(UUID postId, int page, int size) {
+        return service.history(postId, page, size);
+    }
 }

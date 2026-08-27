@@ -1,6 +1,12 @@
 from typing import Any
 
-from mimir_application.api_client import AiJob, BlogPostDetail, DraftVersion
+from mimir_application.api_client import (
+    AiJob,
+    BlogPostDetail,
+    DraftRevisionTurn,
+    DraftRevisionTurnPage,
+    DraftVersion,
+)
 from mimir_application.config import AppConfig
 from mimir_application.main import build_app
 
@@ -123,6 +129,26 @@ class FakeApiClient:
         self.detail = post(1, total_versions=2)
         return self.detail
 
+    def get_draft_revision_turns(self, _: str) -> DraftRevisionTurnPage:
+        return DraftRevisionTurnPage(
+            items=(DraftRevisionTurn(
+                id="job-1",
+                status="COMPLETED",
+                stage="COMPLETE",
+                base_version_id="version-1",
+                result_version_id="version-2",
+                revision_instruction="더 간결하게",
+                error_code=None,
+                created_at="2026-08-27T10:00:00Z",
+                started_at="2026-08-27T10:00:01Z",
+                completed_at="2026-08-27T10:00:02Z",
+            ),),
+            page=0,
+            size=20,
+            total_items=1,
+            total_pages=1,
+        )
+
 
 def load_post(page: FakePage, client: FakeApiClient) -> Any:
     build_app(
@@ -232,3 +258,16 @@ def test_restores_version_only_after_explicit_confirmation() -> None:
     assert client.selected_version_id == "version-1"
     assert find_control(root, key="blog-body").value == "본문 1"
     assert "현재 초안으로 복원" in find_control(root, key="version-status").value
+
+
+def test_shows_persisted_revision_turn_without_exposing_job_id() -> None:
+    page = FakePage()
+    client = FakeApiClient()
+    client.detail = post(2)
+
+    root = load_post(page, client)
+
+    history = find_control(root, key="revision-history").value
+    assert "COMPLETED · v1 → v2" in history
+    assert "더 간결하게" in history
+    assert "job-1" not in history

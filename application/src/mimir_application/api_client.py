@@ -82,6 +82,29 @@ class AiJob:
 
 
 @dataclass(frozen=True)
+class DraftRevisionTurn:
+    id: str
+    status: str
+    stage: str
+    base_version_id: str
+    result_version_id: str | None
+    revision_instruction: str
+    error_code: str | None
+    created_at: str
+    started_at: str | None
+    completed_at: str | None
+
+
+@dataclass(frozen=True)
+class DraftRevisionTurnPage:
+    items: tuple[DraftRevisionTurn, ...]
+    page: int
+    size: int
+    total_items: int
+    total_pages: int
+
+
+@dataclass(frozen=True)
 class BlogAsset:
     id: str
     display_order: int
@@ -265,6 +288,30 @@ class MimirApiClient:
                 "revisionInstruction": revision_instruction,
             },
         ))
+
+    def get_draft_revision_turns(
+        self,
+        post_id: str,
+        *,
+        page: int = 0,
+        size: int = 20,
+    ) -> DraftRevisionTurnPage:
+        payload = self._request(
+            "GET",
+            f"/blog-posts/{post_id}/draft-generation-jobs?page={page}&size={size}",
+        )
+        if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+            raise BackendUnavailableError("Mimir backend returned invalid revision history.")
+        try:
+            return DraftRevisionTurnPage(
+                items=tuple(self._draft_revision_turn(item) for item in payload["items"]),
+                page=int(payload["page"]),
+                size=int(payload["size"]),
+                total_items=int(payload["totalItems"]),
+                total_pages=int(payload["totalPages"]),
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise BackendUnavailableError("Mimir backend returned invalid revision history.") from error
 
     def get_ai_job(self, job_id: str) -> AiJob:
         return self._ai_job(self._request("GET", f"/jobs/{job_id}"))
@@ -452,4 +499,29 @@ class MimirApiClient:
             tags=tuple(str(tag) for tag in payload["tags"]),
             created_at=str(payload["createdAt"]),
             selected=bool(payload["selected"]),
+        )
+
+    @staticmethod
+    def _draft_revision_turn(payload: Any) -> DraftRevisionTurn:
+        if not isinstance(payload, dict):
+            raise TypeError
+        return DraftRevisionTurn(
+            id=str(payload["id"]),
+            status=str(payload["status"]),
+            stage=str(payload["stage"]),
+            base_version_id=str(payload["baseVersionId"]),
+            result_version_id=(
+                str(payload["resultVersionId"])
+                if payload["resultVersionId"] is not None
+                else None
+            ),
+            revision_instruction=str(payload["revisionInstruction"]),
+            error_code=str(payload["errorCode"]) if payload["errorCode"] is not None else None,
+            created_at=str(payload["createdAt"]),
+            started_at=str(payload["startedAt"]) if payload["startedAt"] is not None else None,
+            completed_at=(
+                str(payload["completedAt"])
+                if payload["completedAt"] is not None
+                else None
+            ),
         )

@@ -16,7 +16,13 @@ import {
 import { AppShell } from "@/components/app-shell";
 import { ConfirmActionForm } from "@/components/confirm-action-form";
 import { JobLiveProgress } from "@/components/job-live-progress";
-import { BLOG_POST_STATUSES, getAiJob, getBlogPost, type DraftVersion } from "@/lib/mimir-api";
+import {
+  BLOG_POST_STATUSES,
+  getAiJob,
+  getBlogPost,
+  getDraftRevisionTurns,
+  type DraftVersion,
+} from "@/lib/mimir-api";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +34,11 @@ type DetailPageProps = {
 export default async function BlogDetailPage({ params, searchParams }: DetailPageProps) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const jobId = single(query.jobId);
-  const [post, job] = await Promise.all([getBlogPost(id), jobId ? getAiJob(jobId) : null]);
+  const [post, job, revisionHistory] = await Promise.all([
+    getBlogPost(id),
+    jobId ? getAiJob(jobId) : null,
+    getDraftRevisionTurns(id),
+  ]);
   if (!post) notFound();
   const selectedJob = job?.blogPostId === post.id ? job : null;
   const selectedImageJob = selectedJob?.jobType === "IMAGE_ANALYSIS" ? selectedJob : null;
@@ -180,6 +190,29 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
             )}
             {selectedDraftJob.errorCode && <small>오류 코드: {selectedDraftJob.errorCode}</small>}
           </div>
+        )}
+        <div className="revisionHistoryHeader">
+          <h3>수정 대화 이력</h3>
+          <span>최근 {revisionHistory?.items.length ?? 0} / {revisionHistory?.totalItems ?? 0}건</span>
+        </div>
+        {revisionHistory === null ? (
+          <p className="inlineError">수정 이력을 불러오지 못했습니다.</p>
+        ) : revisionHistory.items.length === 0 ? (
+          <div className="emptyState"><h3>저장된 AI 수정 이력이 없습니다</h3><p>수정 요청을 실행하면 지시와 결과가 여기에 남습니다.</p></div>
+        ) : (
+          <ol className="revisionTurnList">
+            {revisionHistory.items.map((turn) => (
+              <li key={turn.id}>
+                <div className="revisionTurnMeta">
+                  <strong>{revisionStatusLabel(turn.status)}</strong>
+                  <span>{versionLabel(post.versions, turn.baseVersionId)} → {versionLabel(post.versions, turn.resultVersionId)}</span>
+                  <time dateTime={turn.createdAt}>{formatDate(turn.createdAt)}</time>
+                </div>
+                <p>{turn.revisionInstruction}</p>
+                {turn.errorCode && <small>오류 코드: {turn.errorCode}</small>}
+              </li>
+            ))}
+          </ol>
         )}
       </section>
 
@@ -346,6 +379,23 @@ function comparisonSummary(before: DraftVersion, after: DraftVersion) {
     before.tags.join("\u0000") !== after.tags.join("\u0000") ? "태그" : null,
   ].filter(Boolean);
   return changed.length > 0 ? `변경된 항목: ${changed.join(", ")}` : "제목, 본문, 태그 내용이 같습니다.";
+}
+
+function versionLabel(versions: DraftVersion[], versionId: string | null) {
+  if (versionId === null) return "결과 없음";
+  const version = versions.find((candidate) => candidate.id === versionId);
+  return version ? `v${version.versionNumber}` : "버전 없음";
+}
+
+function revisionStatusLabel(status: string) {
+  return ({
+    WAITING: "대기",
+    RUNNING: "생성 중",
+    CANCEL_REQUESTED: "취소 요청",
+    COMPLETED: "완료",
+    FAILED: "실패",
+    CANCELLED: "취소됨",
+  } as Record<string, string>)[status] ?? status;
 }
 
 function safeReturnTo(value: string | undefined) {

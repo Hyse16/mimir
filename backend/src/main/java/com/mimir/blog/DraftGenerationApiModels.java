@@ -1,5 +1,7 @@
 package com.mimir.blog;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import jakarta.validation.constraints.NotBlank;
@@ -14,5 +16,26 @@ final class DraftGenerationApiModels {
     record CreateDraftGenerationJobRequest(
             @NotNull UUID baseVersionId,
             @NotBlank @Size(max = 10_000) String revisionInstruction) {
+    }
+
+    record DraftRevisionTurnResponse(
+            UUID id,
+            AiJobStatus status,
+            AiJobStage stage,
+            UUID baseVersionId,
+            UUID resultVersionId,
+            String revisionInstruction,
+            String errorCode,
+            Instant createdAt,
+            Instant startedAt,
+            Instant completedAt) {
+    }
+
+    record DraftRevisionTurnPageResponse(
+            List<DraftRevisionTurnResponse> items,
+            int page,
+            int size,
+            long totalItems,
+            int totalPages) {
     }
 }

@@ -281,6 +281,36 @@ def test_starts_draft_generation_from_the_selected_version() -> None:
     assert job.job_type == "BLOG_DRAFT_GENERATION"
 
 
+def test_reads_persisted_draft_revision_turns() -> None:
+    payload = {
+        "items": [{
+            "id": "job-2",
+            "status": "FAILED",
+            "stage": "COMPLETE",
+            "baseVersionId": "version-2",
+            "resultVersionId": None,
+            "revisionInstruction": "더 간결하게",
+            "errorCode": "TEXT_GENERATION_FAILED",
+            "createdAt": "2026-08-27T10:00:00Z",
+            "startedAt": "2026-08-27T10:00:01Z",
+            "completedAt": "2026-08-27T10:00:02Z",
+        }],
+        "page": 0,
+        "size": 20,
+        "totalItems": 1,
+        "totalPages": 1,
+    }
+    with patch("mimir_application.api_client.urlopen", return_value=Response(json.dumps(payload).encode())) as request:
+        history = MimirApiClient("http://localhost:8080/api/v1").get_draft_revision_turns("post-1")
+
+    assert request.call_args.args[0].full_url.endswith(
+        "/blog-posts/post-1/draft-generation-jobs?page=0&size=20"
+    )
+    assert history.total_items == 1
+    assert history.items[0].revision_instruction == "더 간결하게"
+    assert history.items[0].error_code == "TEXT_GENERATION_FAILED"
+
+
 def test_surfaces_backend_validation_message() -> None:
     error = HTTPError(
         "http://localhost:8080/api/v1/blog-posts",

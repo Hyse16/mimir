@@ -181,6 +181,31 @@ class DraftGenerationJobIntegrationTest {
         assertThat(detail.status()).isEqualTo(BlogPostStatus.REVIEW_REQUIRED);
     }
 
+    @Test
+    void listsRevisionTurnsNewestFirstWithTheirOutcomes() {
+        var post = analyzedPost("확인된 사실", 1);
+        UUID completedJobId = draftJobService.create(
+                post.id(), post.currentVersionId(), "첫 번째 수정 요청");
+        draftJobRunner.run(completedJobId);
+        var generated = blogService.detail(post.id());
+        textGateway.failNextGeneration();
+        UUID failedJobId = draftJobService.create(
+                post.id(), generated.currentVersionId(), "두 번째 수정 요청");
+        draftJobRunner.run(failedJobId);
+
+        var history = draftJobService.history(post.id(), 0, 20);
+
+        assertThat(history.totalItems()).isEqualTo(2);
+        assertThat(history.items()).extracting(DraftGenerationApiModels.DraftRevisionTurnResponse::id)
+                .containsExactly(failedJobId, completedJobId);
+        assertThat(history.items().getFirst().revisionInstruction()).isEqualTo("두 번째 수정 요청");
+        assertThat(history.items().getFirst().status()).isEqualTo(AiJobStatus.FAILED);
+        assertThat(history.items().getFirst().errorCode()).isEqualTo("TEXT_GENERATION_FAILED");
+        assertThat(history.items().get(1).revisionInstruction()).isEqualTo("첫 번째 수정 요청");
+        assertThat(history.items().get(1).status()).isEqualTo(AiJobStatus.COMPLETED);
+        assertThat(history.items().get(1).resultVersionId()).isEqualTo(generated.currentVersionId());
+    }
+
     private BlogApiModels.BlogPostDetailResponse analyzedPost(String context, int imageCount) {
         var post = blogService.create(new CreateBlogPostRequest("성수 카페", context, "기존 본문", List.of("성수")));
         assetService.upload(post.id(), images(imageCount));

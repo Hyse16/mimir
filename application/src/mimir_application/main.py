@@ -9,6 +9,7 @@ from mimir_application.api_client import (
     BackendUnavailableError,
     BlogPostDetail,
     DraftVersion,
+    DraftRevisionTurn,
     ImageUpload,
     MimirApiClient,
 )
@@ -97,6 +98,21 @@ def build_app(
     )
     revision_cancel_button = ft.OutlinedButton(
         "수정 취소", icon=ft.Icons.CANCEL_OUTLINED, disabled=True, key="cancel-revision"
+    )
+    revision_history_text = ft.TextField(
+        label="최근 수정 turn",
+        value="저장된 AI 수정 이력이 없습니다.",
+        multiline=True,
+        min_lines=4,
+        max_lines=10,
+        read_only=True,
+        key="revision-history",
+    )
+    revision_history_refresh_button = ft.OutlinedButton(
+        "수정 이력 새로고침",
+        icon=ft.Icons.HISTORY,
+        disabled=True,
+        key="refresh-revision-history",
     )
     version_before_selector = ft.Dropdown(
         label="복원 후보 / 이전 버전",
@@ -219,6 +235,7 @@ def build_app(
         restore_button.disabled = True
         version_text.value = "비교는 조회만 수행하며 복원 버튼만 현재 버전을 변경합니다."
         version_text.color = "#5B6470"
+        load_revision_history(post)
 
     def show_analysis_job(job: AiJob) -> None:
         nonlocal current_analysis_job
@@ -327,6 +344,8 @@ def build_app(
         restore_button.disabled = True
         version_text.value = "비교는 조회만 수행하며 복원 버튼만 현재 버전을 변경합니다."
         version_text.color = "#5B6470"
+        revision_history_text.value = "저장된 AI 수정 이력이 없습니다."
+        revision_history_refresh_button.disabled = True
         page.update()
 
     async def pick_images(_: ft.ControlEvent) -> None:
@@ -478,6 +497,7 @@ def build_app(
                     current_post.id, current_post.current_version_id, instruction
                 )
             )
+            load_revision_history(current_post)
         except ApiRequestError as error:
             revision_text.value = f"AI 수정 요청 실패: {error}"
             revision_text.color = "#B42318"
@@ -517,6 +537,8 @@ def build_app(
         page.update()
         try:
             show_draft_job(client.cancel_ai_job(current_draft_job.id))
+            if current_post is not None:
+                load_revision_history(current_post)
         except (ApiRequestError, BackendUnavailableError):
             revision_text.value = "AI 수정을 취소하지 못했습니다."
             revision_text.color = "#B42318"
@@ -526,6 +548,23 @@ def build_app(
     revision_button.on_click = start_revision
     revision_refresh_button.on_click = refresh_revision
     revision_cancel_button.on_click = cancel_revision
+
+    def load_revision_history(post: BlogPostDetail) -> None:
+        try:
+            history = client.get_draft_revision_turns(post.id)
+            revision_history_text.value = revision_history_document(post, history.items)
+            revision_history_refresh_button.disabled = False
+        except (ApiRequestError, BackendUnavailableError):
+            revision_history_text.value = "AI 수정 이력을 불러오지 못했습니다."
+            revision_history_refresh_button.disabled = False
+
+    def refresh_revision_history(_: ft.ControlEvent) -> None:
+        if current_post is None:
+            return
+        load_revision_history(current_post)
+        page.update()
+
+    revision_history_refresh_button.on_click = refresh_revision_history
 
     def selected_version(version_id: str | None) -> DraftVersion | None:
         if current_post is None or version_id is None:
@@ -787,9 +826,15 @@ def build_app(
                             ),
                             revision_field,
                             revision_text,
+                            revision_history_text,
                             ft.Row(
                                 alignment=ft.MainAxisAlignment.END,
-                                controls=[revision_refresh_button, revision_cancel_button, revision_button],
+                                controls=[
+                                    revision_history_refresh_button,
+                                    revision_refresh_button,
+                                    revision_cancel_button,
+                                    revision_button,
+                                ],
                             ),
                         ]
                     ),
@@ -832,6 +877,31 @@ def version_document(version: DraftVersion) -> list[str]:
         "본문:",
         *version.body.splitlines(),
     ]
+
+
+def revision_history_document(
+    post: BlogPostDetail,
+    turns: tuple[DraftRevisionTurn, ...],
+) -> str:
+    if not turns:
+        return "저장된 AI 수정 이력이 없습니다."
+    version_labels = {
+        version.id: f"v{version.version_number}"
+        for version in post.versions
+    }
+    lines: list[str] = []
+    for turn in turns:
+        base = version_labels.get(turn.base_version_id, "기준 버전 없음")
+        result = (
+            version_labels.get(turn.result_version_id, "결과 버전 없음")
+            if turn.result_version_id is not None
+            else "결과 버전 없음"
+        )
+        outcome = f"{turn.status} · {base} → {result}"
+        if turn.error_code:
+            outcome += f" · {turn.error_code}"
+        lines.extend((outcome, turn.revision_instruction, turn.created_at, ""))
+    return "\n".join(lines).rstrip()
 
 
 def run() -> None:

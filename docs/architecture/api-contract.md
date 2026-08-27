@@ -69,6 +69,7 @@ The backend rejects a stale or unrelated `baseVersionId`. It never overwrites an
 | --- | --- | --- |
 | `POST` | `/api/v1/blog-posts/{postId}/generation-jobs` | Start structured image analysis |
 | `POST` | `/api/v1/blog-posts/{postId}/draft-generation-jobs` | Generate a new grounded draft version from the selected base version |
+| `GET` | `/api/v1/blog-posts/{postId}/draft-generation-jobs` | Page through persisted revision turns newest first |
 | `GET` | `/api/v1/jobs/{jobId}` | Read durable status and counts |
 | `POST` | `/api/v1/jobs/{jobId}/retry-failed` | Retry only failed items from a partial failure |
 | `POST` | `/api/v1/jobs/{jobId}/cancel` | Request cancellation |
@@ -87,6 +88,8 @@ Events are committed with the job state transition and are resumable with the `L
 Cancellation is cooperative. A waiting job is cancelled immediately; a running provider call is allowed to finish its current batch, after which unstarted items become `CANCELLED`. Repeated cancellation of `CANCEL_REQUESTED` or `CANCELLED` jobs is idempotent. The backoffice consumes SSE through a same-origin streaming proxy, while both clients can still refresh the durable `GET /jobs/{jobId}` representation.
 
 Draft-generation requests contain `baseVersionId` and a non-blank `revisionInstruction`. Every current image must have a successful structured analysis before the job starts. The job records its base and result version IDs, moves through `CONTEXT_ASSEMBLY` and `DRAFT_GENERATION`, and stores accepted output as a new `AI_GENERATED` version. If the selected version changes during inference, the generated output is discarded with `STALE_BASE_VERSION`. User version requests cannot assign `AI_GENERATED`; that source is reserved for the server generation path.
+
+Revision-turn history is read from the same durable job records rather than duplicated into chat storage. Each item exposes the instruction, base and nullable result version IDs, lifecycle status, stage, nullable error code, and timestamps. The endpoint is paginated with a default size of 20 and maximum size of 100. Failed and cancelled turns remain visible because they are part of the audit trail.
 
 ## System status
 

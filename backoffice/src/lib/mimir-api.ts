@@ -86,6 +86,27 @@ export type AiJob = {
   items: ImageAnalysisItem[];
 };
 
+export type DraftRevisionTurn = {
+  id: string;
+  status: AiJob["status"];
+  stage: AiJob["stage"];
+  baseVersionId: string;
+  resultVersionId: string | null;
+  revisionInstruction: string;
+  errorCode: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+};
+
+export type DraftRevisionTurnPage = {
+  items: DraftRevisionTurn[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+};
+
 export type BlogPostDetail = BlogPostSummary & {
   visitContext: string;
   currentVersion: DraftVersion;
@@ -254,6 +275,30 @@ function isAiJob(value: unknown): value is AiJob {
       (item.analysis === null || isImageAnalysis(item.analysis)));
 }
 
+function isDraftRevisionTurn(value: unknown): value is DraftRevisionTurn {
+  return isRecord(value) &&
+    typeof value.id === "string" &&
+    ["WAITING", "RUNNING", "CANCEL_REQUESTED", "COMPLETED", "PARTIAL_FAILED", "FAILED", "CANCELLED"].includes(String(value.status)) &&
+    ["QUEUED", "IMAGE_ANALYSIS", "CONTEXT_ASSEMBLY", "DRAFT_GENERATION", "COMPLETE"].includes(String(value.stage)) &&
+    typeof value.baseVersionId === "string" &&
+    (typeof value.resultVersionId === "string" || value.resultVersionId === null) &&
+    typeof value.revisionInstruction === "string" &&
+    (typeof value.errorCode === "string" || value.errorCode === null) &&
+    typeof value.createdAt === "string" &&
+    (typeof value.startedAt === "string" || value.startedAt === null) &&
+    (typeof value.completedAt === "string" || value.completedAt === null);
+}
+
+function isDraftRevisionTurnPage(value: unknown): value is DraftRevisionTurnPage {
+  return isRecord(value) &&
+    Array.isArray(value.items) &&
+    value.items.every(isDraftRevisionTurn) &&
+    typeof value.page === "number" &&
+    typeof value.size === "number" &&
+    typeof value.totalItems === "number" &&
+    typeof value.totalPages === "number";
+}
+
 function isBlogPostPage(value: unknown): value is BlogPostPage {
   if (!isRecord(value)) return false;
   return (
@@ -331,6 +376,17 @@ export async function getBlogPosts(query: BlogPostQuery = {}): Promise<BlogPostP
 export async function getBlogPost(id: string): Promise<BlogPostDetail | null> {
   const payload = await getJson(`/blog-posts/${encodeURIComponent(id)}`);
   return isBlogPostDetail(payload) ? payload : null;
+}
+
+export async function getDraftRevisionTurns(
+  postId: string,
+  page = 0,
+  size = 20,
+): Promise<DraftRevisionTurnPage | null> {
+  const payload = await getJson(
+    `/blog-posts/${encodeURIComponent(postId)}/draft-generation-jobs?page=${page}&size=${size}`,
+  );
+  return isDraftRevisionTurnPage(payload) ? payload : null;
 }
 
 export async function archiveBlogPost(id: string): Promise<BlogPostDetail | null> {
