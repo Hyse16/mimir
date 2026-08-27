@@ -265,8 +265,11 @@ class MimirApiClient:
     def retry_failed_image_analysis(self, job_id: str) -> AiJob:
         return self._ai_job(self._request("POST", f"/jobs/{job_id}/retry-failed"))
 
-    def cancel_image_analysis_job(self, job_id: str) -> AiJob:
+    def cancel_ai_job(self, job_id: str) -> AiJob:
         return self._ai_job(self._request("POST", f"/jobs/{job_id}/cancel"))
+
+    def cancel_image_analysis_job(self, job_id: str) -> AiJob:
+        return self.cancel_ai_job(job_id)
 
     def _request(
         self,

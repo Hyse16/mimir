@@ -203,7 +203,7 @@ def test_starts_and_reads_structured_image_analysis_job() -> None:
     assert job.items[0].analysis.objects == ("cake", "plate")
 
 
-def test_requests_image_analysis_cancellation() -> None:
+def test_requests_ai_job_cancellation() -> None:
     payload = {
         "id": "job-1",
         "blogPostId": "post-1",
@@ -228,7 +228,7 @@ def test_requests_image_analysis_cancellation() -> None:
         }],
     }
     with patch("mimir_application.api_client.urlopen", return_value=Response(json.dumps(payload).encode())) as request:
-        job = MimirApiClient("http://localhost:8080/api/v1").cancel_image_analysis_job("job-1")
+        job = MimirApiClient("http://localhost:8080/api/v1").cancel_ai_job("job-1")
 
     assert request.call_args.args[0].full_url.endswith("/jobs/job-1/cancel")
     assert job.status == "CANCEL_REQUESTED"

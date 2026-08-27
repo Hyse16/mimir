@@ -22,7 +22,8 @@ STEP 4 now has a provider-independent generation boundary and a durable asynchro
 - Successful output persisted as a new immutable `AI_GENERATED` version and selected under `REVIEW_REQUIRED`
 - Stale base-version detection after inference; stale or cancelled output is never persisted
 - Backoffice revision instruction, live progress, cancellation, terminal refresh, and error-code display
-- Python API client support for starting draft-generation jobs
+- Flet revision workspace with instruction validation, unsaved-edit protection, polling, cancellation, and completed-version reload
+- Python API client support for starting, polling, and cancelling draft-generation jobs
 - Server-owned draft source: user version requests always create `USER_EDIT`, while only the generation service creates `AI_GENERATED`
 
 ## Database and API impact
@@ -43,6 +44,7 @@ Focused tests verify:
 - Prices and personal experiences absent from user context are rejected
 - Non-loopback URLs and cloud model identifiers are rejected
 - PostgreSQL integration covers successful AI version creation, missing image analysis, stale base versions, provider failure, and cancellation after inference
+- Flet tests cover revision start, unsaved-edit blocking, cancellation, polling completion, and first-save enablement
 - The exact production text prompt and JSON Schema passed a local `qwen2.5:7b` run in 15.00 seconds, including 5.55 seconds model load time
 
 The live evidence in `docs/evidence/step-4-text-gateway.json` confirms Korean structured output, ordered `{{IMAGE:1}}` and `{{IMAGE:2}}` placement, no unsupported price/wait/service/order claims, and completion within the three-minute Gateway timeout.
@@ -65,7 +67,6 @@ TEXT_RESULT_PATH=docs/evidence/step-4-text-gateway.json \
 
 ## Next STEP 4 slice
 
-- Add the Flet interactive revision instruction and live/polling progress controls
 - Add version-to-version comparison in both workspaces
 - Add a deliberate restore action distinct from merely viewing an older version
 - Expand live grounding regression samples before supporting freer conversational revision turns

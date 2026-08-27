@@ -13,11 +13,16 @@ from mimir_application.api_client import (
 from mimir_application.config import AppConfig
 
 
-def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
+def build_app(
+    page: ft.Page,
+    config: AppConfig | None = None,
+    api_client: MimirApiClient | None = None,
+) -> None:
     settings = config or AppConfig.from_environment()
-    client = MimirApiClient(settings.api_base_url)
+    client = api_client or MimirApiClient(settings.api_base_url)
     current_post: BlogPostDetail | None = None
-    current_job: AiJob | None = None
+    current_analysis_job: AiJob | None = None
+    current_draft_job: AiJob | None = None
     selected_images: list[ImageUpload] = []
 
     page.title = "Mimir"
@@ -60,11 +65,37 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
     result_text = ft.Text("아직 저장된 초안이 없습니다.", color="#5B6470")
     asset_text = ft.Text("게시글을 저장한 뒤 이미지를 최대 20장까지 추가할 수 있습니다.", color="#5B6470")
     analysis_text = ft.Text("이미지 업로드 후 구조화 분석을 시작할 수 있습니다.", color="#5B6470")
-    save_button = ft.FilledButton("첫 초안 저장", icon=ft.Icons.SAVE_OUTLINED)
+    save_button = ft.FilledButton(
+        "첫 초안 저장", icon=ft.Icons.SAVE_OUTLINED, key="save-draft"
+    )
     upload_button = ft.FilledButton("선택 이미지 업로드", icon=ft.Icons.UPLOAD, disabled=True)
     analysis_button = ft.FilledButton("이미지 분석 시작", icon=ft.Icons.AUTO_AWESOME, disabled=True)
     analysis_refresh_button = ft.OutlinedButton("분석 상태 새로고침", icon=ft.Icons.REFRESH, disabled=True)
     analysis_cancel_button = ft.OutlinedButton("분석 취소", icon=ft.Icons.CANCEL_OUTLINED, disabled=True)
+    revision_field = ft.TextField(
+        label="AI 수정 요청",
+        hint_text="예: 문장을 더 간결하게 다듬되 사진 순서와 사실은 유지해줘.",
+        multiline=True,
+        min_lines=2,
+        max_lines=4,
+        max_length=10_000,
+        disabled=True,
+        key="revision-instruction",
+    )
+    revision_text = ft.Text(
+        "게시글과 이미지 분석을 준비한 뒤 로컬 AI에 수정을 요청할 수 있습니다.",
+        color="#5B6470",
+        key="revision-status",
+    )
+    revision_button = ft.FilledButton(
+        "AI 수정 시작", icon=ft.Icons.AUTO_FIX_HIGH, disabled=True, key="start-revision"
+    )
+    revision_refresh_button = ft.OutlinedButton(
+        "진행 상태 새로고침", icon=ft.Icons.REFRESH, disabled=True, key="refresh-revision"
+    )
+    revision_cancel_button = ft.OutlinedButton(
+        "수정 취소", icon=ft.Icons.CANCEL_OUTLINED, disabled=True, key="cancel-revision"
+    )
 
     def refresh_status(_: ft.ControlEvent | None = None) -> None:
         try:
@@ -84,7 +115,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         return [tag.strip() for tag in (tags_field.value or "").split(",") if tag.strip()]
 
     def show_post(post: BlogPostDetail) -> None:
-        nonlocal current_post, current_job
+        nonlocal current_post, current_analysis_job, current_draft_job
         current_post = post
         post_selector.value = post.id
         title_field.value = post.current_version.title
@@ -92,6 +123,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         body_field.value = post.current_version.body
         tags_field.value = ", ".join(post.current_version.tags)
         save_button.text = "새 버전 저장"
+        save_button.disabled = False
         selector_text.value = f"{post.title} · 현재 버전 {post.current_version.version_number} · {post.status}"
         selector_text.color = "#16803C"
         result_text.value = "기존 초안을 불러왔습니다. 저장하면 새 버전으로 보관됩니다."
@@ -100,17 +132,24 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         upload_button.disabled = True
         asset_text.value = f"저장된 이미지 {len(post.assets)} / 20장"
         asset_text.color = "#5B6470"
-        current_job = None
+        current_analysis_job = None
         analysis_button.text = "이미지 분석 시작"
         analysis_button.disabled = len(post.assets) == 0
         analysis_refresh_button.disabled = True
         analysis_cancel_button.disabled = True
         analysis_text.value = "이미지 업로드 후 구조화 분석을 시작할 수 있습니다."
         analysis_text.color = "#5B6470"
+        current_draft_job = None
+        revision_field.disabled = False
+        revision_button.disabled = False
+        revision_refresh_button.disabled = True
+        revision_cancel_button.disabled = True
+        revision_text.value = "현재 선택된 버전을 기준으로 새 AI 버전을 생성합니다. 저장하지 않은 편집은 먼저 저장해주세요."
+        revision_text.color = "#5B6470"
 
-    def show_job(job: AiJob) -> None:
-        nonlocal current_job
-        current_job = job
+    def show_analysis_job(job: AiJob) -> None:
+        nonlocal current_analysis_job
+        current_analysis_job = job
         active = job.status in {"WAITING", "RUNNING", "CANCEL_REQUESTED"}
         analysis_refresh_button.disabled = not active
         analysis_cancel_button.disabled = job.status not in {"WAITING", "RUNNING"}
@@ -123,6 +162,20 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
             f"전체 {job.total_items} · {job.progress}%"
         )
         analysis_text.color = "#B42318" if job.failed_items else "#16803C"
+
+    def show_draft_job(job: AiJob) -> None:
+        nonlocal current_draft_job
+        current_draft_job = job
+        active = job.status in {"WAITING", "RUNNING", "CANCEL_REQUESTED"}
+        revision_field.disabled = active
+        revision_button.disabled = active
+        revision_refresh_button.disabled = not active
+        revision_cancel_button.disabled = job.status not in {"WAITING", "RUNNING"}
+        details = f"{job.status} · {job.stage} · {job.progress}%"
+        if job.error_code:
+            details += f" · 오류 {job.error_code}"
+        revision_text.value = details
+        revision_text.color = "#B42318" if job.status == "FAILED" else "#16803C"
 
     def refresh_posts(_: ft.ControlEvent | None = None) -> None:
         try:
@@ -155,7 +208,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         page.update()
 
     def start_new(_: ft.ControlEvent) -> None:
-        nonlocal current_post, current_job
+        nonlocal current_post, current_analysis_job, current_draft_job
         current_post = None
         post_selector.value = None
         post_selector.error_text = None
@@ -172,13 +225,22 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         upload_button.disabled = True
         asset_text.value = "게시글을 저장한 뒤 이미지를 최대 20장까지 추가할 수 있습니다."
         asset_text.color = "#5B6470"
-        current_job = None
+        current_analysis_job = None
         analysis_button.text = "이미지 분석 시작"
         analysis_button.disabled = True
         analysis_refresh_button.disabled = True
         analysis_cancel_button.disabled = True
         analysis_text.value = "이미지 업로드 후 구조화 분석을 시작할 수 있습니다."
         analysis_text.color = "#5B6470"
+        current_draft_job = None
+        revision_field.value = ""
+        revision_field.disabled = True
+        revision_field.error_text = None
+        revision_button.disabled = True
+        revision_refresh_button.disabled = True
+        revision_cancel_button.disabled = True
+        revision_text.value = "게시글과 이미지 분석을 준비한 뒤 로컬 AI에 수정을 요청할 수 있습니다."
+        revision_text.color = "#5B6470"
         page.update()
 
     async def pick_images(_: ft.ControlEvent) -> None:
@@ -256,11 +318,11 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         page.update()
         try:
             job = (
-                client.retry_failed_image_analysis(current_job.id)
-                if current_job is not None and current_job.status in {"PARTIAL_FAILED", "FAILED"}
+                client.retry_failed_image_analysis(current_analysis_job.id)
+                if current_analysis_job is not None and current_analysis_job.status in {"PARTIAL_FAILED", "FAILED"}
                 else client.create_image_analysis_job(current_post.id)
             )
-            show_job(job)
+            show_analysis_job(job)
         except ApiRequestError as error:
             analysis_text.value = f"이미지 분석 요청 실패: {error}"
             analysis_text.color = "#B42318"
@@ -272,24 +334,24 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         page.update()
 
     def refresh_analysis(_: ft.ControlEvent) -> None:
-        if current_job is None:
+        if current_analysis_job is None:
             return
         try:
-            show_job(client.get_ai_job(current_job.id))
+            show_analysis_job(client.get_ai_job(current_analysis_job.id))
         except (ApiRequestError, BackendUnavailableError):
             analysis_text.value = "이미지 분석 상태를 불러오지 못했습니다."
             analysis_text.color = "#B42318"
         page.update()
 
     def cancel_analysis(_: ft.ControlEvent) -> None:
-        if current_job is None:
+        if current_analysis_job is None:
             return
         analysis_cancel_button.disabled = True
         analysis_text.value = "이미지 분석 취소 요청 중…"
         analysis_text.color = "#5B6470"
         page.update()
         try:
-            show_job(client.cancel_image_analysis_job(current_job.id))
+            show_analysis_job(client.cancel_ai_job(current_analysis_job.id))
         except (ApiRequestError, BackendUnavailableError):
             analysis_text.value = "이미지 분석을 취소하지 못했습니다."
             analysis_text.color = "#B42318"
@@ -299,6 +361,85 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
     analysis_button.on_click = start_analysis
     analysis_refresh_button.on_click = refresh_analysis
     analysis_cancel_button.on_click = cancel_analysis
+
+    def start_revision(_: ft.ControlEvent) -> None:
+        if current_post is None:
+            return
+        instruction = (revision_field.value or "").strip()
+        if not instruction:
+            revision_field.error_text = "수정 요청을 입력해주세요."
+            page.update()
+            return
+        if (
+            (title_field.value or "") != current_post.current_version.title
+            or (body_field.value or "") != current_post.current_version.body
+            or tuple(parse_tags()) != current_post.current_version.tags
+            or (context_field.value or "") != current_post.visit_context
+        ):
+            revision_text.value = "저장하지 않은 편집이 있습니다. 새 버전으로 저장한 뒤 AI 수정을 시작해주세요."
+            revision_text.color = "#B42318"
+            page.update()
+            return
+
+        revision_field.error_text = None
+        revision_button.disabled = True
+        revision_text.value = "로컬 AI 수정 작업 요청 중…"
+        revision_text.color = "#5B6470"
+        page.update()
+        try:
+            show_draft_job(
+                client.create_draft_generation_job(
+                    current_post.id, current_post.current_version_id, instruction
+                )
+            )
+        except ApiRequestError as error:
+            revision_text.value = f"AI 수정 요청 실패: {error}"
+            revision_text.color = "#B42318"
+            revision_button.disabled = False
+        except BackendUnavailableError:
+            revision_text.value = "AI 수정 요청 실패: 업무 서버에 연결할 수 없습니다."
+            revision_text.color = "#B42318"
+            revision_button.disabled = False
+        page.update()
+
+    def refresh_revision(_: ft.ControlEvent) -> None:
+        nonlocal current_post
+        if current_draft_job is None:
+            return
+        try:
+            job = client.get_ai_job(current_draft_job.id)
+            if job.status == "COMPLETED" and current_post is not None:
+                current_post = client.get_blog_post(current_post.id)
+                show_post(current_post)
+                revision_text.value = (
+                    f"수정 완료 · 버전 {current_post.current_version.version_number}를 불러왔습니다."
+                )
+                revision_text.color = "#16803C"
+            else:
+                show_draft_job(job)
+        except (ApiRequestError, BackendUnavailableError):
+            revision_text.value = "AI 수정 상태를 불러오지 못했습니다."
+            revision_text.color = "#B42318"
+        page.update()
+
+    def cancel_revision(_: ft.ControlEvent) -> None:
+        if current_draft_job is None:
+            return
+        revision_cancel_button.disabled = True
+        revision_text.value = "AI 수정 취소 요청 중…"
+        revision_text.color = "#5B6470"
+        page.update()
+        try:
+            show_draft_job(client.cancel_ai_job(current_draft_job.id))
+        except (ApiRequestError, BackendUnavailableError):
+            revision_text.value = "AI 수정을 취소하지 못했습니다."
+            revision_text.color = "#B42318"
+            revision_cancel_button.disabled = False
+        page.update()
+
+    revision_button.on_click = start_revision
+    revision_refresh_button.on_click = refresh_revision
+    revision_cancel_button.on_click = cancel_revision
 
     def save_draft(_: ft.ControlEvent) -> None:
         nonlocal current_post
@@ -314,6 +455,7 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
         result_text.color = "#5B6470"
         page.update()
         try:
+            was_new = current_post is None
             if current_post is None:
                 current_post = client.create_blog_post(
                     title=title,
@@ -321,8 +463,6 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                     body=body_field.value or "",
                     tags=parse_tags(),
                 )
-                asset_text.value = "게시글이 저장되었습니다. 이제 이미지를 선택할 수 있습니다."
-                asset_text.color = "#16803C"
             else:
                 current_post = client.add_blog_version(
                     current_post.id,
@@ -332,6 +472,10 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                     tags=parse_tags(),
                     visit_context=context_field.value or "",
                 )
+            show_post(current_post)
+            if was_new:
+                asset_text.value = "게시글이 저장되었습니다. 이제 이미지를 선택할 수 있습니다."
+                asset_text.color = "#16803C"
             version = current_post.current_version
             result_text.value = (
                 f"저장 완료 · 버전 {version.version_number} · {current_post.status} · "
@@ -418,7 +562,12 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                                 controls=[
                                     post_selector,
                                     ft.OutlinedButton("목록 새로고침", icon=ft.Icons.REFRESH, on_click=refresh_posts),
-                                    ft.OutlinedButton("불러오기", icon=ft.Icons.DOWNLOAD_OUTLINED, on_click=load_selected),
+                                    ft.OutlinedButton(
+                                        "불러오기",
+                                        icon=ft.Icons.DOWNLOAD_OUTLINED,
+                                        on_click=load_selected,
+                                        key="load-blog-post",
+                                    ),
                                     ft.TextButton("새 글", icon=ft.Icons.ADD, on_click=start_new),
                                 ]
                             ),
@@ -459,6 +608,27 @@ def build_app(page: ft.Page, config: AppConfig | None = None) -> None:
                             ft.Row(
                                 alignment=ft.MainAxisAlignment.END,
                                 controls=[analysis_refresh_button, analysis_cancel_button, analysis_button],
+                            ),
+                        ]
+                    ),
+                ),
+                ft.Container(height=12),
+                ft.Container(
+                    bgcolor="#FFFFFF",
+                    border_radius=16,
+                    padding=24,
+                    content=ft.Column(
+                        controls=[
+                            ft.Text("로컬 AI 수정", size=18, weight=ft.FontWeight.W_600),
+                            ft.Text(
+                                "현재 버전과 사실 메모, 이미지 분석 결과를 근거로 새 버전을 만듭니다.",
+                                color="#5B6470",
+                            ),
+                            revision_field,
+                            revision_text,
+                            ft.Row(
+                                alignment=ft.MainAxisAlignment.END,
+                                controls=[revision_refresh_button, revision_cancel_button, revision_button],
                             ),
                         ]
                     ),
