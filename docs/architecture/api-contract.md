@@ -39,7 +39,7 @@ The `traceId` correlates non-sensitive logs. Prompts, browser cookies, OAuth tok
 | `POST` | `/api/v1/blog-posts/{postId}/assets` | Upload and append validated assets, enforcing the total limit of 20 |
 | `PUT` | `/api/v1/blog-posts/{postId}/assets/order` | Persist complete display order |
 | `DELETE` | `/api/v1/blog-posts/{postId}/assets/{assetId}` | Delete one original and its derivatives, then compact display order |
-| `POST` | `/api/v1/blog-posts/{postId}/versions` | Save a user edit or AI revision as an immutable version |
+| `POST` | `/api/v1/blog-posts/{postId}/versions` | Save a user edit as an immutable version |
 | `GET` | `/api/v1/blog-posts/{postId}/versions` | List version summaries newest first |
 | `GET` | `/api/v1/blog-posts/{postId}/versions/{versionId}` | Read one version |
 | `POST` | `/api/v1/blog-posts/{postId}/versions/{versionId}/select` | Select a version as the current approved draft |
@@ -57,18 +57,18 @@ Image uploads use multipart field `files`, allow JPEG, PNG, and WebP only, and e
   "title": "성수 카페 방문기",
   "body": "수정된 본문",
   "tags": ["성수", "카페"],
-  "visitContext": "일요일 오후에 친구와 방문",
-  "source": "USER_EDIT"
+  "visitContext": "일요일 오후에 친구와 방문"
 }
 ```
 
-The backend rejects a stale or unrelated `baseVersionId`. It never overwrites an existing version. When `visitContext` is present, the factual context and new draft version are committed in the same transaction. AI-generated versions use `source: AI_GENERATED` and retain the provider route and job identifier as metadata without storing secrets.
+The backend rejects a stale or unrelated `baseVersionId`. It never overwrites an existing version. When `visitContext` is present, the factual context and new draft version are committed in the same transaction. This endpoint always creates `USER_EDIT`; AI-generated versions use the server-owned generation path and are correlated through `ai_jobs.result_version_id` without storing secrets.
 
 ## Job resources
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/v1/blog-posts/{postId}/generation-jobs` | Start image analysis and grounded draft generation |
+| `POST` | `/api/v1/blog-posts/{postId}/generation-jobs` | Start structured image analysis |
+| `POST` | `/api/v1/blog-posts/{postId}/draft-generation-jobs` | Generate a new grounded draft version from the selected base version |
 | `GET` | `/api/v1/jobs/{jobId}` | Read durable status and counts |
 | `POST` | `/api/v1/jobs/{jobId}/retry-failed` | Retry only failed items from a partial failure |
 | `POST` | `/api/v1/jobs/{jobId}/cancel` | Request cancellation |
@@ -85,6 +85,8 @@ data: {"eventId":18,"jobId":"01J...","status":"RUNNING","stage":"IMAGE_ANALYSIS"
 Events are committed with the job state transition and are resumable with the `Last-Event-ID` request header. The durable job record remains authoritative after reconnect. A subset of image failures produces `PARTIAL_FAILED`; successful image analysis remains available and only failed items are eligible for targeted retry.
 
 Cancellation is cooperative. A waiting job is cancelled immediately; a running provider call is allowed to finish its current batch, after which unstarted items become `CANCELLED`. Repeated cancellation of `CANCEL_REQUESTED` or `CANCELLED` jobs is idempotent. The backoffice consumes SSE through a same-origin streaming proxy, while both clients can still refresh the durable `GET /jobs/{jobId}` representation.
+
+Draft-generation requests contain `baseVersionId` and a non-blank `revisionInstruction`. Every current image must have a successful structured analysis before the job starts. The job records its base and result version IDs, moves through `CONTEXT_ASSEMBLY` and `DRAFT_GENERATION`, and stores accepted output as a new `AI_GENERATED` version. If the selected version changes during inference, the generated output is discarded with `STALE_BASE_VERSION`. User version requests cannot assign `AI_GENERATED`; that source is reserved for the server generation path.
 
 ## System status
 

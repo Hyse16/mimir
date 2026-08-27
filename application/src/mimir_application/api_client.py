@@ -68,12 +68,16 @@ class AiJob:
     id: str
     blog_post_id: str
     parent_job_id: str | None
+    job_type: str
     status: str
     stage: str
     total_items: int
     processed_items: int
     failed_items: int
     progress: int
+    base_version_id: str | None
+    result_version_id: str | None
+    error_code: str | None
     items: tuple[ImageAnalysisItem, ...]
 
 
@@ -197,7 +201,6 @@ class MimirApiClient:
                 "body": body,
                 "tags": tags,
                 "visitContext": visit_context,
-                "source": "USER_EDIT",
             },
         )
         return self._blog_post_detail(payload)
@@ -240,6 +243,21 @@ class MimirApiClient:
 
     def create_image_analysis_job(self, post_id: str) -> AiJob:
         return self._ai_job(self._request("POST", f"/blog-posts/{post_id}/generation-jobs"))
+
+    def create_draft_generation_job(
+        self,
+        post_id: str,
+        base_version_id: str,
+        revision_instruction: str,
+    ) -> AiJob:
+        return self._ai_job(self._request(
+            "POST",
+            f"/blog-posts/{post_id}/draft-generation-jobs",
+            {
+                "baseVersionId": base_version_id,
+                "revisionInstruction": revision_instruction,
+            },
+        ))
 
     def get_ai_job(self, job_id: str) -> AiJob:
         return self._ai_job(self._request("GET", f"/jobs/{job_id}"))
@@ -370,12 +388,16 @@ class MimirApiClient:
                 id=str(payload["id"]),
                 blog_post_id=str(payload["blogPostId"]),
                 parent_job_id=str(payload["parentJobId"]) if payload["parentJobId"] is not None else None,
+                job_type=str(payload["jobType"]),
                 status=str(payload["status"]),
                 stage=str(payload["stage"]),
                 total_items=int(payload["totalItems"]),
                 processed_items=int(payload["processedItems"]),
                 failed_items=int(payload["failedItems"]),
                 progress=int(payload["progress"]),
+                base_version_id=str(payload["baseVersionId"]) if payload.get("baseVersionId") is not None else None,
+                result_version_id=str(payload["resultVersionId"]) if payload.get("resultVersionId") is not None else None,
+                error_code=str(payload["errorCode"]) if payload.get("errorCode") is not None else None,
                 items=tuple(MimirApiClient._analysis_item(item) for item in payload["items"]),
             )
         except (KeyError, TypeError, ValueError) as error:

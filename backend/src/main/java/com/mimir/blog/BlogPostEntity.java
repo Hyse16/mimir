@@ -89,6 +89,23 @@ class BlogPostEntity {
         this.updatedAt = now;
     }
 
+    void startGeneration(Instant now) {
+        status = BlogPostStatus.GENERATING;
+        updatedAt = now;
+    }
+
+    void finishGeneration(Instant now) {
+        status = BlogPostStatus.REVIEW_REQUIRED;
+        updatedAt = now;
+    }
+
+    void failGeneration(Instant now) {
+        if (status == BlogPostStatus.GENERATING) {
+            status = BlogPostStatus.REVIEW_REQUIRED;
+            updatedAt = now;
+        }
+    }
+
     void touch(Instant now) {
         this.updatedAt = now;
     }

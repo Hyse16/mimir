@@ -1,0 +1,25 @@
+{
+  "model": "qwen2.5:7b",
+  "total_seconds": 14.998720375,
+  "load_seconds": 5.554133084,
+  "prompt_tokens": 368,
+  "output_tokens": 181,
+  "done_reason": "stop",
+  "checks": {
+    "structured_draft": true,
+    "korean_output": true,
+    "ordered_placeholders": true,
+    "no_unsupported_price_wait_service_order": true,
+    "within_gateway_timeout": true
+  },
+  "draft": {
+    "title": "성수 카페 기록",
+    "body": "지난 토요일 친구와 성수에서 방문했습니다. 바스크 치즈케이크가 제일 맛있었습니다. 커피는 산미가 조금 강했습니다.\n\n{{IMAGE:1}}\n접시 위에 놓인 바스크 치즈케이크를 보여줍니다. 케이크와 포크, 접시가 함께 사진에 담겨 있습니다.\n\n{{IMAGE:2}}\n원형 테이블과 나무 의자가 있는 카페 실내 모습입니다. 화분도 눈에 띕니다.",
+    "tags": [
+      "성수",
+      "카페",
+      "바스크치즈케이크"
+    ]
+  },
+  "passed": true
+}

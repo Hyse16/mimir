@@ -69,9 +69,9 @@ export type AiJob = {
   id: string;
   blogPostId: string;
   parentJobId: string | null;
-  jobType: "IMAGE_ANALYSIS";
+  jobType: "IMAGE_ANALYSIS" | "BLOG_DRAFT_GENERATION";
   status: "WAITING" | "RUNNING" | "CANCEL_REQUESTED" | "COMPLETED" | "PARTIAL_FAILED" | "FAILED" | "CANCELLED";
-  stage: "QUEUED" | "IMAGE_ANALYSIS" | "COMPLETE";
+  stage: "QUEUED" | "IMAGE_ANALYSIS" | "CONTEXT_ASSEMBLY" | "DRAFT_GENERATION" | "COMPLETE";
   totalItems: number;
   processedItems: number;
   failedItems: number;
@@ -80,6 +80,9 @@ export type AiJob = {
   startedAt: string | null;
   completedAt: string | null;
   cancelRequestedAt: string | null;
+  baseVersionId: string | null;
+  resultVersionId: string | null;
+  errorCode: string | null;
   items: ImageAnalysisItem[];
 };
 
@@ -229,9 +232,9 @@ function isAiJob(value: unknown): value is AiJob {
   return typeof value.id === "string" &&
     typeof value.blogPostId === "string" &&
     (typeof value.parentJobId === "string" || value.parentJobId === null) &&
-    value.jobType === "IMAGE_ANALYSIS" &&
+    ["IMAGE_ANALYSIS", "BLOG_DRAFT_GENERATION"].includes(String(value.jobType)) &&
     ["WAITING", "RUNNING", "CANCEL_REQUESTED", "COMPLETED", "PARTIAL_FAILED", "FAILED", "CANCELLED"].includes(String(value.status)) &&
-    ["QUEUED", "IMAGE_ANALYSIS", "COMPLETE"].includes(String(value.stage)) &&
+    ["QUEUED", "IMAGE_ANALYSIS", "CONTEXT_ASSEMBLY", "DRAFT_GENERATION", "COMPLETE"].includes(String(value.stage)) &&
     typeof value.totalItems === "number" &&
     typeof value.processedItems === "number" &&
     typeof value.failedItems === "number" &&
@@ -240,6 +243,9 @@ function isAiJob(value: unknown): value is AiJob {
     (typeof value.startedAt === "string" || value.startedAt === null) &&
     (typeof value.completedAt === "string" || value.completedAt === null) &&
     (typeof value.cancelRequestedAt === "string" || value.cancelRequestedAt === null) &&
+    (typeof value.baseVersionId === "string" || value.baseVersionId === null) &&
+    (typeof value.resultVersionId === "string" || value.resultVersionId === null) &&
+    (typeof value.errorCode === "string" || value.errorCode === null) &&
     Array.isArray(value.items) && value.items.every((item) => isRecord(item) &&
       typeof item.assetId === "string" &&
       typeof item.displayOrder === "number" &&
@@ -349,7 +355,6 @@ export async function saveBlogVersion(
 ): Promise<BlogPostDetail | null> {
   const payload = await sendJson(`/blog-posts/${encodeURIComponent(id)}/versions`, "POST", {
     ...input,
-    source: "USER_EDIT",
   });
   return isBlogPostDetail(payload) ? payload : null;
 }
@@ -374,6 +379,18 @@ export async function deleteBlogAsset(id: string, assetId: string): Promise<Blog
 
 export async function createImageAnalysisJob(postId: string): Promise<AiJob | null> {
   const payload = await sendJson(`/blog-posts/${encodeURIComponent(postId)}/generation-jobs`, "POST");
+  return isAiJob(payload) ? payload : null;
+}
+
+export async function createDraftGenerationJob(
+  postId: string,
+  baseVersionId: string,
+  revisionInstruction: string,
+): Promise<AiJob | null> {
+  const payload = await sendJson(`/blog-posts/${encodeURIComponent(postId)}/draft-generation-jobs`, "POST", {
+    baseVersionId,
+    revisionInstruction,
+  });
   return isAiJob(payload) ? payload : null;
 }
 

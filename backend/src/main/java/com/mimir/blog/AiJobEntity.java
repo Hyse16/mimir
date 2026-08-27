@@ -59,6 +59,18 @@ class AiJobEntity {
     @Column(name = "cancel_requested_at")
     private Instant cancelRequestedAt;
 
+    @Column(name = "base_version_id")
+    private UUID baseVersionId;
+
+    @Column(name = "result_version_id")
+    private UUID resultVersionId;
+
+    @Column(name = "revision_instruction", columnDefinition = "text")
+    private String revisionInstruction;
+
+    @Column(name = "error_code", length = 64)
+    private String errorCode;
+
     protected AiJobEntity() {
     }
 
@@ -76,10 +88,40 @@ class AiJobEntity {
         this.createdAt = createdAt;
     }
 
+    AiJobEntity(
+            UUID id,
+            UUID blogPostId,
+            UUID baseVersionId,
+            String revisionInstruction,
+            Instant createdAt) {
+        this.id = id;
+        this.blogPostId = blogPostId;
+        this.jobType = AiJobType.BLOG_DRAFT_GENERATION;
+        this.status = AiJobStatus.WAITING;
+        this.stage = AiJobStage.QUEUED;
+        this.totalItems = 1;
+        this.processedItems = 0;
+        this.failedItems = 0;
+        this.progress = 0;
+        this.createdAt = createdAt;
+        this.baseVersionId = baseVersionId;
+        this.revisionInstruction = revisionInstruction;
+    }
+
     void start(Instant now) {
         status = AiJobStatus.RUNNING;
         stage = AiJobStage.IMAGE_ANALYSIS;
         startedAt = now;
+    }
+
+    void start(AiJobStage runningStage, Instant now) {
+        status = AiJobStatus.RUNNING;
+        stage = runningStage;
+        startedAt = now;
+    }
+
+    void advanceStage(AiJobStage nextStage) {
+        stage = nextStage;
     }
 
     void requestCancellation(Instant now) {
@@ -105,6 +147,24 @@ class AiJobEntity {
                     ? AiJobStatus.COMPLETED
                     : processedItems == 0 ? AiJobStatus.FAILED : AiJobStatus.PARTIAL_FAILED;
         }
+    }
+
+    void completeDraft(UUID versionId, Instant now) {
+        resultVersionId = versionId;
+        processedItems = 1;
+        progress = 100;
+        status = AiJobStatus.COMPLETED;
+        stage = AiJobStage.COMPLETE;
+        completedAt = now;
+    }
+
+    void fail(String code, Instant now) {
+        errorCode = code;
+        failedItems = 1;
+        progress = 100;
+        status = AiJobStatus.FAILED;
+        stage = AiJobStage.COMPLETE;
+        completedAt = now;
     }
 
     UUID getId() {
@@ -161,5 +221,21 @@ class AiJobEntity {
 
     Instant getCancelRequestedAt() {
         return cancelRequestedAt;
+    }
+
+    UUID getBaseVersionId() {
+        return baseVersionId;
+    }
+
+    UUID getResultVersionId() {
+        return resultVersionId;
+    }
+
+    String getRevisionInstruction() {
+        return revisionInstruction;
+    }
+
+    String getErrorCode() {
+        return errorCode;
     }
 }

@@ -31,8 +31,7 @@ final class BlogApiModels {
             @NotBlank @Size(max = 200) String title,
             @Size(max = 100_000) String body,
             @Size(max = 30) List<@NotBlank @Size(max = 50) String> tags,
-            @Size(max = 10_000) String visitContext,
-            @NotNull DraftSource source) {
+            @Size(max = 10_000) String visitContext) {
     }
 
     record BlogPostSummaryResponse(

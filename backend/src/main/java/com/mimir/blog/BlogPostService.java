@@ -171,7 +171,7 @@ public class BlogPostService {
                 UUID.randomUUID(),
                 postId,
                 nextVersion,
-                request.source(),
+                DraftSource.USER_EDIT,
                 request.title().trim(),
                 normalizedText(request.body()),
                 normalizeTags(request.tags()),

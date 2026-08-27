@@ -234,6 +234,41 @@ def test_requests_image_analysis_cancellation() -> None:
     assert job.status == "CANCEL_REQUESTED"
 
 
+def test_starts_draft_generation_from_the_selected_version() -> None:
+    payload = {
+        "id": "job-2",
+        "blogPostId": "post-1",
+        "parentJobId": None,
+        "jobType": "BLOG_DRAFT_GENERATION",
+        "status": "WAITING",
+        "stage": "QUEUED",
+        "totalItems": 1,
+        "processedItems": 0,
+        "failedItems": 0,
+        "progress": 0,
+        "createdAt": "2026-08-27T10:00:00Z",
+        "startedAt": None,
+        "completedAt": None,
+        "cancelRequestedAt": None,
+        "baseVersionId": "version-1",
+        "resultVersionId": None,
+        "errorCode": None,
+        "items": [],
+    }
+    with patch("mimir_application.api_client.urlopen", return_value=Response(json.dumps(payload).encode())) as request:
+        job = MimirApiClient("http://localhost:8080/api/v1").create_draft_generation_job(
+            "post-1", "version-1", "간결하게 수정해줘"
+        )
+
+    sent = request.call_args.args[0]
+    assert sent.full_url.endswith("/blog-posts/post-1/draft-generation-jobs")
+    assert json.loads(sent.data) == {
+        "baseVersionId": "version-1",
+        "revisionInstruction": "간결하게 수정해줘",
+    }
+    assert job.job_type == "BLOG_DRAFT_GENERATION"
+
+
 def test_surfaces_backend_validation_message() -> None:
     error = HTTPError(
         "http://localhost:8080/api/v1/blog-posts",

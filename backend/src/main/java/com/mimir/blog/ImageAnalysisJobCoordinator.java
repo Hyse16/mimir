@@ -18,7 +18,7 @@ class ImageAnalysisJobCoordinator {
     ImageAnalysisJobCoordinator(
             ImageAnalysisJobService service,
             ImageAnalysisJobRunner runner,
-            @Qualifier("imageAnalysisTaskExecutor") TaskExecutor taskExecutor) {
+            @Qualifier("localAiTaskExecutor") TaskExecutor taskExecutor) {
         this.service = service;
         this.runner = runner;
         this.taskExecutor = taskExecutor;

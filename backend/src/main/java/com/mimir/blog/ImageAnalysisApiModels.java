@@ -42,6 +42,9 @@ final class ImageAnalysisApiModels {
             Instant startedAt,
             Instant completedAt,
             Instant cancelRequestedAt,
+            UUID baseVersionId,
+            UUID resultVersionId,
+            String errorCode,
             List<ImageAnalysisItemResponse> items) {
     }
 

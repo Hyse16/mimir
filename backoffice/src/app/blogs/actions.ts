@@ -6,6 +6,7 @@ import {
   archiveBlogPost,
   BLOG_POST_STATUSES,
   createImageAnalysisJob,
+  createDraftGenerationJob,
   cancelImageAnalysisJob,
   deleteBlogAsset,
   duplicateBlogPost,
@@ -21,6 +22,19 @@ export async function startImageAnalysisAction(postId: string, returnTo: string)
 
   revalidateBlog(postId);
   redirect(detailHref(postId, returnTo, `notice=analysis-start&jobId=${encodeURIComponent(job.id)}`));
+}
+
+export async function startDraftGenerationAction(postId: string, returnTo: string, formData: FormData) {
+  const baseVersionId = text(formData, "baseVersionId");
+  const revisionInstruction = text(formData, "revisionInstruction").trim();
+  if (!baseVersionId || !revisionInstruction) {
+    redirect(detailHref(postId, returnTo, "error=draft-generation-validation"));
+  }
+  const job = await createDraftGenerationJob(postId, baseVersionId, revisionInstruction);
+  if (!job) redirect(detailHref(postId, returnTo, "error=draft-generation-start"));
+
+  revalidateBlog(postId);
+  redirect(detailHref(postId, returnTo, `notice=draft-generation-start&jobId=${encodeURIComponent(job.id)}`));
 }
 
 export async function retryImageAnalysisAction(postId: string, returnTo: string, jobId: string) {

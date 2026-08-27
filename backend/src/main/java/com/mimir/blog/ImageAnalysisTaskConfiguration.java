@@ -10,13 +10,13 @@ import org.springframework.scheduling.TaskScheduler;
 @Configuration
 class ImageAnalysisTaskConfiguration {
 
-    @Bean("imageAnalysisTaskExecutor")
-    TaskExecutor imageAnalysisTaskExecutor() {
+    @Bean("localAiTaskExecutor")
+    TaskExecutor localAiTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(1);
         executor.setMaxPoolSize(1);
         executor.setQueueCapacity(20);
-        executor.setThreadNamePrefix("image-analysis-");
+        executor.setThreadNamePrefix("local-ai-");
         executor.initialize();
         return executor;
     }

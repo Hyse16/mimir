@@ -13,7 +13,7 @@ import com.mimir.ai.TextGenerationGateway.DraftGenerationRequest;
 import com.mimir.ai.TextGenerationGateway.GeneratedDraft;
 
 @Component
-class GeneratedDraftValidator {
+public class GeneratedDraftValidator {
 
     private static final Pattern IMAGE_PLACEHOLDER = Pattern.compile(
             "\\{\\{IMAGE:(\\d+)\\}\\}", Pattern.CASE_INSENSITIVE);
@@ -26,14 +26,14 @@ class GeneratedDraftValidator {
             List.of("재방문", "다시 방문", "또 가고"),
             List.of("월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"));
 
-    GeneratedDraft validate(DraftGenerationRequest request, GeneratedDraft draft) {
+    public GeneratedDraft validate(DraftGenerationRequest request, GeneratedDraft draft) {
         String title = required(draft.title(), "Generated title is required.");
         String body = required(draft.body(), "Generated body is required.");
         if (title.length() > 200 || body.length() > 100_000) {
             throw new TextGenerationException("Generated draft exceeds the supported length.");
         }
         List<String> tags = draft.tags().stream()
-                .map(String::strip)
+                .map(this::normalizeTag)
                 .filter(value -> !value.isEmpty())
                 .distinct()
                 .toList();
@@ -72,6 +72,14 @@ class GeneratedDraftValidator {
 
     private boolean containsAny(String value, List<String> indicators) {
         return indicators.stream().anyMatch(value::contains);
+    }
+
+    private String normalizeTag(String value) {
+        String tag = value == null ? "" : value.strip();
+        if (tag.startsWith("#")) {
+            tag = tag.substring(1);
+        }
+        return tag.toLowerCase(Locale.ROOT);
     }
 
     private String required(String value, String message) {

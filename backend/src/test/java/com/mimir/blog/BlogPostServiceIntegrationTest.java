@@ -79,8 +79,7 @@ class BlogPostServiceIntegrationTest {
                 "성수 카페 방문기",
                 "과장 표현을 줄인 두 번째 본문",
                 List.of("#카페", "카페", "성수"),
-                "일요일에 친구와 다시 방문",
-                DraftSource.USER_EDIT));
+                "일요일에 친구와 다시 방문"));
 
         assertThat(revised.currentVersion().versionNumber()).isEqualTo(2);
         assertThat(revised.currentVersion().tags()).containsExactly("카페", "성수");
@@ -107,16 +106,14 @@ class BlogPostServiceIntegrationTest {
                 "수정 초안",
                 "수정 본문",
                 List.of(),
-                null,
-                DraftSource.USER_EDIT));
+                null));
 
         assertThatThrownBy(() -> service.addVersion(created.id(), new CreateDraftVersionRequest(
                 created.currentVersionId(),
                 "충돌 초안",
                 "충돌 본문",
                 List.of(),
-                "저장되면 안 되는 메모",
-                DraftSource.USER_EDIT)))
+                "저장되면 안 되는 메모")))
                 .isInstanceOf(StaleDraftVersionException.class);
         assertThat(service.detail(created.id()).visitContext()).isEqualTo("확인된 사실");
     }
@@ -150,8 +147,7 @@ class BlogPostServiceIntegrationTest {
                 "수정된 원본",
                 "현재 선택된 본문",
                 List.of("기록", "수정"),
-                null,
-                DraftSource.USER_EDIT));
+                null));
 
         var duplicated = service.duplicate(created.id());
 

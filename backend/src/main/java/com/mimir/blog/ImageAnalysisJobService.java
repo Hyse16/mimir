@@ -309,6 +309,9 @@ class ImageAnalysisJobService {
                 job.getStartedAt(),
                 job.getCompletedAt(),
                 job.getCancelRequestedAt(),
+                job.getBaseVersionId(),
+                job.getResultVersionId(),
+                job.getErrorCode(),
                 items.stream().map(item -> new ImageAnalysisItemResponse(
                         item.getAssetId(),
                         item.getDisplayOrder(),

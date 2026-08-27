@@ -6,6 +6,7 @@ import {
   duplicateBlogPostAction,
   reorderBlogAssetsAction,
   saveBlogDraftAction,
+  startDraftGenerationAction,
   startImageAnalysisAction,
   cancelImageAnalysisAction,
   retryImageAnalysisAction,
@@ -29,6 +30,8 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
   const [post, job] = await Promise.all([getBlogPost(id), jobId ? getAiJob(jobId) : null]);
   if (!post) notFound();
   const selectedJob = job?.blogPostId === post.id ? job : null;
+  const selectedImageJob = selectedJob?.jobType === "IMAGE_ANALYSIS" ? selectedJob : null;
+  const selectedDraftJob = selectedJob?.jobType === "BLOG_DRAFT_GENERATION" ? selectedJob : null;
 
   const returnTo = safeReturnTo(single(query.returnTo));
   const archiveAction = archiveBlogPostAction.bind(null, post.id, returnTo);
@@ -36,6 +39,7 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
   const saveAction = saveBlogDraftAction.bind(null, post.id, returnTo);
   const statusAction = updateBlogStatusAction.bind(null, post.id, returnTo);
   const analysisAction = startImageAnalysisAction.bind(null, post.id, returnTo);
+  const draftGenerationAction = startDraftGenerationAction.bind(null, post.id, returnTo);
   const assetIds = post.assets.map((asset) => asset.id);
   const uploadAction = `/api/blog-posts/${encodeURIComponent(post.id)}/assets?returnTo=${encodeURIComponent(returnTo)}`;
   const notice = single(query.notice);
@@ -58,6 +62,7 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
       {notice === "analysis-start" && <p className="noticeBanner" role="status">이미지 분석 작업을 시작했습니다.</p>}
       {notice === "analysis-retry" && <p className="noticeBanner" role="status">실패 이미지 재분석을 시작했습니다.</p>}
       {notice === "analysis-cancel" && <p className="noticeBanner" role="status">이미지 분석 취소를 요청했습니다.</p>}
+      {notice === "draft-generation-start" && <p className="noticeBanner" role="status">로컬 AI 초안 생성 작업을 시작했습니다.</p>}
       {error && <p className="noticeBanner error" role="alert">요청을 처리하지 못했습니다. 백엔드 연결 상태를 확인해주세요.</p>}
 
       <section className="detailGrid">
@@ -81,32 +86,33 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
           <form action={analysisAction}>
             <button
               className="primaryButton"
-              disabled={post.assets.length === 0 || selectedJob?.status === "WAITING" || selectedJob?.status === "RUNNING" || selectedJob?.status === "CANCEL_REQUESTED"}
+              disabled={post.assets.length === 0 || selectedImageJob?.status === "WAITING" || selectedImageJob?.status === "RUNNING" || selectedImageJob?.status === "CANCEL_REQUESTED"}
               type="submit"
-            >{selectedJob?.status === "WAITING" || selectedJob?.status === "RUNNING" || selectedJob?.status === "CANCEL_REQUESTED" ? "분석 진행 중" : "전체 이미지 분석"}</button>
+            >{selectedImageJob?.status === "WAITING" || selectedImageJob?.status === "RUNNING" || selectedImageJob?.status === "CANCEL_REQUESTED" ? "분석 진행 중" : "전체 이미지 분석"}</button>
           </form>
         </div>
-        {selectedJob ? (
+        {selectedImageJob ? (
           <>
             <div className="jobSummary">
               <JobLiveProgress
-                eventUrl={`/api/jobs/${encodeURIComponent(selectedJob.id)}/events`}
-                initialJob={selectedJob}
+                eventUrl={`/api/jobs/${encodeURIComponent(selectedImageJob.id)}/events`}
+                initialJob={selectedImageJob}
+                key={selectedImageJob.id}
               />
-              <Link className="actionButton" href={`/blogs/${encodeURIComponent(post.id)}?returnTo=${encodeURIComponent(returnTo)}&jobId=${encodeURIComponent(selectedJob.id)}`}>상태 새로고침</Link>
-              {(selectedJob.status === "WAITING" || selectedJob.status === "RUNNING" || selectedJob.status === "CANCEL_REQUESTED") && (
-                <form action={cancelImageAnalysisAction.bind(null, post.id, returnTo, selectedJob.id)}>
+              <Link className="actionButton" href={`/blogs/${encodeURIComponent(post.id)}?returnTo=${encodeURIComponent(returnTo)}&jobId=${encodeURIComponent(selectedImageJob.id)}`}>상태 새로고침</Link>
+              {(selectedImageJob.status === "WAITING" || selectedImageJob.status === "RUNNING" || selectedImageJob.status === "CANCEL_REQUESTED") && (
+                <form action={cancelImageAnalysisAction.bind(null, post.id, returnTo, selectedImageJob.id)}>
                   <button className="actionButton" type="submit">분석 취소</button>
                 </form>
               )}
-              {(selectedJob.status === "PARTIAL_FAILED" || selectedJob.status === "FAILED") && (
-                <form action={retryImageAnalysisAction.bind(null, post.id, returnTo, selectedJob.id)}>
+              {(selectedImageJob.status === "PARTIAL_FAILED" || selectedImageJob.status === "FAILED") && (
+                <form action={retryImageAnalysisAction.bind(null, post.id, returnTo, selectedImageJob.id)}>
                   <button className="actionButton" type="submit">실패 이미지 재분석</button>
                 </form>
               )}
             </div>
             <ol className="analysisList">
-              {selectedJob.items.map((item) => (
+              {selectedImageJob.items.map((item) => (
                 <li key={item.assetId}>
                   <span className="assetOrder">{item.displayOrder + 1}</span>
                   <span>
@@ -120,6 +126,48 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
           </>
         ) : (
           <div className="emptyState"><h3>선택된 분석 작업이 없습니다</h3><p>이미지를 분석하면 진행 상태와 구조화 결과가 여기에 표시됩니다.</p></div>
+        )}
+      </section>
+
+      <section className="panel editPanel">
+        <div className="panelHeader">
+          <div><h2>로컬 AI 초안 수정</h2><p>현재 선택 버전과 사실 메모, 완료된 이미지 분석만 사용해 새 버전을 생성합니다.</p></div>
+        </div>
+        <form action={draftGenerationAction} className="draftForm">
+          <input name="baseVersionId" type="hidden" value={post.currentVersionId} />
+          <label>
+            <span>수정 지시</span>
+            <textarea
+              defaultValue="사실은 유지하고 편안한 존댓말의 네이버 블로그 글로 다듬어줘."
+              maxLength={10000}
+              name="revisionInstruction"
+              required
+              rows={3}
+            />
+          </label>
+          <div className="formActions">
+            <button
+              className="primaryButton"
+              disabled={selectedDraftJob?.status === "WAITING" || selectedDraftJob?.status === "RUNNING" || selectedDraftJob?.status === "CANCEL_REQUESTED"}
+              type="submit"
+            >{selectedDraftJob?.status === "WAITING" || selectedDraftJob?.status === "RUNNING" || selectedDraftJob?.status === "CANCEL_REQUESTED" ? "초안 생성 중" : "AI 새 버전 생성"}</button>
+          </div>
+        </form>
+        {selectedDraftJob && (
+          <div className="jobSummary">
+            <JobLiveProgress
+              eventUrl={`/api/jobs/${encodeURIComponent(selectedDraftJob.id)}/events`}
+              initialJob={selectedDraftJob}
+              key={selectedDraftJob.id}
+            />
+            <Link className="actionButton" href={`/blogs/${encodeURIComponent(post.id)}?returnTo=${encodeURIComponent(returnTo)}&jobId=${encodeURIComponent(selectedDraftJob.id)}`}>상태 새로고침</Link>
+            {(selectedDraftJob.status === "WAITING" || selectedDraftJob.status === "RUNNING" || selectedDraftJob.status === "CANCEL_REQUESTED") && (
+              <form action={cancelImageAnalysisAction.bind(null, post.id, returnTo, selectedDraftJob.id)}>
+                <button className="actionButton" type="submit">생성 취소</button>
+              </form>
+            )}
+            {selectedDraftJob.errorCode && <small>오류 코드: {selectedDraftJob.errorCode}</small>}
+          </div>
         )}
       </section>
 

@@ -36,9 +36,11 @@ export function JobLiveProgress({ initialJob, eventUrl }: { initialJob: AiJob; e
     <>
       <div>
         <strong>{statusLabel(snapshot.status)}</strong>
-        <small>{snapshot.processedItems} 성공 · {snapshot.failedItems} 실패 · 총 {snapshot.totalItems}장</small>
+        <small>{initialJob.jobType === "IMAGE_ANALYSIS"
+          ? `${snapshot.processedItems} 성공 · ${snapshot.failedItems} 실패 · 총 ${snapshot.totalItems}장`
+          : draftStageLabel(snapshot.status)}</small>
       </div>
-      <progress aria-label="이미지 분석 진행률" max={100} value={snapshot.progress}>{snapshot.progress}%</progress>
+      <progress aria-label="AI 작업 진행률" max={100} value={snapshot.progress}>{snapshot.progress}%</progress>
     </>
   );
 }
@@ -64,12 +66,19 @@ function parseSnapshot(data: string): ProgressSnapshot | null {
 
 function statusLabel(status: AiJob["status"]) {
   return {
-    WAITING: "분석 대기",
-    RUNNING: "이미지 분석 중",
+    WAITING: "작업 대기",
+    RUNNING: "작업 진행 중",
     CANCEL_REQUESTED: "취소 처리 중",
-    COMPLETED: "분석 완료",
-    PARTIAL_FAILED: "일부 이미지 분석 실패",
-    FAILED: "이미지 분석 실패",
-    CANCELLED: "분석 취소됨",
+    COMPLETED: "작업 완료",
+    PARTIAL_FAILED: "일부 작업 실패",
+    FAILED: "작업 실패",
+    CANCELLED: "작업 취소됨",
   }[status];
+}
+
+function draftStageLabel(status: AiJob["status"]) {
+  if (status === "COMPLETED") return "새 AI 초안 버전이 저장되었습니다.";
+  if (status === "FAILED") return "초안 생성 결과를 저장하지 않았습니다.";
+  if (status === "CANCELLED") return "취소되어 새 버전을 만들지 않았습니다.";
+  return "Context와 이미지 분석을 바탕으로 초안을 생성합니다.";
 }
