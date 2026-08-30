@@ -65,8 +65,20 @@ class DraftGenerationJobService {
 
     @Transactional
     public UUID create(UUID postId, UUID baseVersionId, String revisionInstruction) {
+        return create(postId, baseVersionId, revisionInstruction, DraftGenerationTarget.FULL);
+    }
+
+    @Transactional
+    public UUID create(
+            UUID postId,
+            UUID baseVersionId,
+            String revisionInstruction,
+            DraftGenerationTarget target) {
         if (baseVersionId == null || revisionInstruction == null || revisionInstruction.isBlank()) {
             throw new IllegalArgumentException("Base version and revision instruction are required.");
+        }
+        if (target == null) {
+            throw new IllegalArgumentException("Draft generation target is required.");
         }
         BlogPostEntity post = requiredPostForUpdate(postId);
         if (post.getStatus() == BlogPostStatus.ARCHIVED) {
@@ -79,7 +91,7 @@ class DraftGenerationJobService {
         requireImageFacts(postId);
         Instant now = clock.instant();
         AiJobEntity job = jobRepository.save(new AiJobEntity(
-                UUID.randomUUID(), postId, baseVersionId, revisionInstruction.strip(), now));
+                UUID.randomUUID(), postId, baseVersionId, revisionInstruction.strip(), target, now));
         recordEvent(job, now);
         return job.getId();
     }
@@ -139,9 +151,11 @@ class DraftGenerationJobService {
         return new DraftGenerationRequest(
                 baseVersion.getTitle(),
                 baseVersion.getBody(),
+                baseVersion.getTags(),
                 context.getVisitContext(),
                 imageFacts,
-                job.getRevisionInstruction());
+                job.getRevisionInstruction(),
+                job.getGenerationTarget().toGatewayTarget());
     }
 
     @Transactional
@@ -225,9 +239,11 @@ class DraftGenerationJobService {
         return new DraftGenerationRequest(
                 baseVersion.getTitle(),
                 baseVersion.getBody(),
+                baseVersion.getTags(),
                 context.getVisitContext(),
                 requireImageFacts(job.getBlogPostId()),
-                job.getRevisionInstruction());
+                job.getRevisionInstruction(),
+                job.getGenerationTarget().toGatewayTarget());
     }
 
     private void requireNoActiveJob(UUID postId) {
@@ -264,6 +280,7 @@ class DraftGenerationJobService {
                 job.getBaseVersionId(),
                 job.getResultVersionId(),
                 job.getRevisionInstruction(),
+                job.getGenerationTarget(),
                 job.getErrorCode(),
                 job.getCreatedAt(),
                 job.getStartedAt(),

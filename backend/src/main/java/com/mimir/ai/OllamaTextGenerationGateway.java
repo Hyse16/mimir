@@ -28,8 +28,10 @@ class OllamaTextGenerationGateway implements TextGenerationGateway {
             Describe visible facts neutrally. Do not infer quality, atmosphere, comfort, emotion, popularity, or recommendations.
             Use descriptive adjectives only when the exact meaning appears in the supplied facts.
             Preserve explicitly requested grounded numbers and dates exactly; never alter or approximate them.
-            Use every image exactly once as {{IMAGE:1}}, {{IMAGE:2}}, and so on in display order.
-            Keep image placeholders on their own line and connect surrounding prose only to grounded facts.
+            Revise only the field named by target. Other generated fields are ignored and preserved server-side.
+            Target FULL means regenerate title, body, and tags, and still include every required image placeholder.
+            For FULL or BODY, use every image exactly once as {{IMAGE:1}}, {{IMAGE:2}}, and so on in display order.
+            For FULL or BODY, keep image placeholders on their own line and connect surrounding prose only to grounded facts.
             Apply the revision instruction while preserving facts. Return only the requested structured output.
             """;
 

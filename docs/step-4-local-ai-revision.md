@@ -32,12 +32,18 @@ STEP 4 now has a provider-independent generation boundary, a durable asynchronou
 - Deliberate restore controls: Flet requires an explicit confirmation checkbox and Backoffice uses a confirmation dialog
 - Paginated PostgreSQL-backed revision-turn history with instruction, base/result version, outcome, error code, and timestamps
 - Flet and Backoffice audit views that show revision outcomes without exposing internal job IDs
+- Constrained `FULL`, `TITLE`, `BODY`, and `TAGS` regeneration targets in both workspaces
+- Server-side preservation of every non-target field, independent of provider output
+- Target-specific grounding and placeholder checks before creating an immutable version
+- Revision-turn audit entries that record which field set was requested
 - Server-owned draft source: user version requests always create `USER_EDIT`, while only the generation service creates `AI_GENERATED`
 
 ## Database and API impact
 
-- Database: append-only V7 migration extends `ai_jobs` and `ai_job_events`; existing rows remain valid
+- Database: append-only V7 migration extends `ai_jobs` and `ai_job_events`; V8 records the constrained generation target and backfills existing draft jobs as `FULL`
 - API: `POST /api/v1/blog-posts/{postId}/draft-generation-jobs`
+  - Request accepts `target`: `FULL`, `TITLE`, `BODY`, or `TAGS`; omitted values default to `FULL`
+  - Non-target title, body, and tags are copied from the immutable base version on the server
 - Existing API reused for restoration: `POST /api/v1/blog-posts/{postId}/versions/{versionId}/select`
 - API: `GET /api/v1/blog-posts/{postId}/draft-generation-jobs?page=0&size=20`
 - Shared job responses now expose nullable `baseVersionId`, `resultVersionId`, and `errorCode`
@@ -58,7 +64,9 @@ Focused tests verify:
 - Validator regressions cover changed prices and weekdays, invented dates and wait durations, unsupported taste/recommendation/service/atmosphere claims, and equivalent Korean/ISO dates
 - PostgreSQL integration verifies revision turns remain newest-first with completed and failed outcomes
 - Flet API/UI tests verify revision instructions and outcomes are visible without rendering internal job IDs
-- Three production-contract `qwen2.5:7b` scenarios completed in 24.69 seconds with their expected grounding decisions
+- Validator tests cover each partial target, preservation of non-target fields, body placeholder order, tag normalization, and target-specific unsupported-claim rejection
+- PostgreSQL integration verifies a title-only job changes only the title and persists `TITLE` in its audit turn
+- Three production-contract `qwen2.5:7b` scenarios completed in 27.48 seconds with their expected grounding decisions
 
 The live evidence in `docs/evidence/step-4-text-gateway.json` confirms Korean structured output, two- and three-image placeholder order, exact grounded values, and completion within the three-minute Gateway timeout. The hostile sparse-context sample intentionally receives `REJECT`: `qwen2.5:7b` still follows an instruction to embellish unsupported atmosphere and quality, so the server-side validator remains a required defense rather than an optional fallback.
 
@@ -80,6 +88,7 @@ TEXT_RESULT_PATH=docs/evidence/step-4-text-gateway.json \
 
 ## Next STEP 4 slice
 
-- Add constrained partial-regeneration targets only after each target has its own grounding regression coverage
+- Exercise every partial target against the live local model and retain representative accepted/rejected evidence
+- Evaluate explicit turn-to-turn instruction linkage without treating prior model output as new user-grounded fact
 
 The grounding validator is a deliberate defense layer, not a proof that every possible hallucination can be recognized. New unsupported-claim families found in live evaluation must become regression cases before expanding the generation surface.

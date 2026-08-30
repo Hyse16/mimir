@@ -204,6 +204,66 @@ class DraftGenerationJobIntegrationTest {
         assertThat(history.items().get(1).revisionInstruction()).isEqualTo("첫 번째 수정 요청");
         assertThat(history.items().get(1).status()).isEqualTo(AiJobStatus.COMPLETED);
         assertThat(history.items().get(1).resultVersionId()).isEqualTo(generated.currentVersionId());
+        assertThat(history.items()).extracting(DraftGenerationApiModels.DraftRevisionTurnResponse::target)
+                .containsOnly(DraftGenerationTarget.FULL);
+    }
+
+    @Test
+    void titleTargetPersistsOnlyTheGeneratedTitle() {
+        var post = analyzedPost("확인된 사실", 1);
+        UUID jobId = draftJobService.create(
+                post.id(),
+                post.currentVersionId(),
+                "제목만 더 간결하게",
+                DraftGenerationTarget.TITLE);
+
+        draftJobRunner.run(jobId);
+
+        var generated = blogService.detail(post.id());
+        assertThat(generated.currentVersion().title()).isEqualTo("AI 성수 카페 기록");
+        assertThat(generated.currentVersion().body()).isEqualTo(post.currentVersion().body());
+        assertThat(generated.currentVersion().tags()).isEqualTo(post.currentVersion().tags());
+        assertThat(draftJobService.history(post.id(), 0, 20).items().getFirst().target())
+                .isEqualTo(DraftGenerationTarget.TITLE);
+    }
+
+    @Test
+    void bodyTargetPersistsOnlyTheGeneratedBody() {
+        var post = analyzedPost("확인된 사실", 1);
+        UUID jobId = draftJobService.create(
+                post.id(),
+                post.currentVersionId(),
+                "본문만 더 간결하게",
+                DraftGenerationTarget.BODY);
+
+        draftJobRunner.run(jobId);
+
+        var generated = blogService.detail(post.id());
+        assertThat(generated.currentVersion().title()).isEqualTo(post.currentVersion().title());
+        assertThat(generated.currentVersion().body()).contains("{{IMAGE:1}}");
+        assertThat(generated.currentVersion().body()).isNotEqualTo(post.currentVersion().body());
+        assertThat(generated.currentVersion().tags()).isEqualTo(post.currentVersion().tags());
+        assertThat(draftJobService.history(post.id(), 0, 20).items().getFirst().target())
+                .isEqualTo(DraftGenerationTarget.BODY);
+    }
+
+    @Test
+    void tagsTargetPersistsOnlyTheGeneratedTags() {
+        var post = analyzedPost("확인된 사실", 1);
+        UUID jobId = draftJobService.create(
+                post.id(),
+                post.currentVersionId(),
+                "태그만 정리해줘",
+                DraftGenerationTarget.TAGS);
+
+        draftJobRunner.run(jobId);
+
+        var generated = blogService.detail(post.id());
+        assertThat(generated.currentVersion().title()).isEqualTo(post.currentVersion().title());
+        assertThat(generated.currentVersion().body()).isEqualTo(post.currentVersion().body());
+        assertThat(generated.currentVersion().tags()).containsExactly("카페", "성수");
+        assertThat(draftJobService.history(post.id(), 0, 20).items().getFirst().target())
+                .isEqualTo(DraftGenerationTarget.TAGS);
     }
 
     private BlogApiModels.BlogPostDetailResponse analyzedPost(String context, int imageCount) {

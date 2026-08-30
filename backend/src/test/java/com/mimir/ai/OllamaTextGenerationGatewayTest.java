@@ -19,6 +19,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import com.mimir.ai.TextGenerationGateway.DraftGenerationRequest;
+import com.mimir.ai.TextGenerationGateway.DraftTarget;
 import com.mimir.ai.TextGenerationGateway.ImageFact;
 
 import tools.jackson.databind.json.JsonMapper;
@@ -49,9 +50,11 @@ class OllamaTextGenerationGatewayTest {
         var result = gateway.generate(new DraftGenerationRequest(
                 "기존 제목",
                 "기존 본문",
+                List.of("기존태그"),
                 "확인된 방문 사실",
                 List.of(new ImageFact(0, "음식", "접시 위 케이크", List.of("케이크"), null)),
-                "간결하게 수정"));
+                "간결하게 수정",
+                DraftTarget.FULL));
 
         assertThat(result.title()).isEqualTo("성수 카페 기록");
         assertThat(result.tags()).containsExactly("성수", "카페");

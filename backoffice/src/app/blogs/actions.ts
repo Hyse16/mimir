@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import {
   archiveBlogPost,
   BLOG_POST_STATUSES,
+  DRAFT_GENERATION_TARGETS,
   createImageAnalysisJob,
   createDraftGenerationJob,
   cancelImageAnalysisJob,
@@ -28,10 +29,16 @@ export async function startImageAnalysisAction(postId: string, returnTo: string)
 export async function startDraftGenerationAction(postId: string, returnTo: string, formData: FormData) {
   const baseVersionId = text(formData, "baseVersionId");
   const revisionInstruction = text(formData, "revisionInstruction").trim();
-  if (!baseVersionId || !revisionInstruction) {
+  const target = text(formData, "target");
+  if (!baseVersionId || !revisionInstruction || !DRAFT_GENERATION_TARGETS.includes(target as (typeof DRAFT_GENERATION_TARGETS)[number])) {
     redirect(detailHref(postId, returnTo, "error=draft-generation-validation"));
   }
-  const job = await createDraftGenerationJob(postId, baseVersionId, revisionInstruction);
+  const job = await createDraftGenerationJob(
+    postId,
+    baseVersionId,
+    revisionInstruction,
+    target as (typeof DRAFT_GENERATION_TARGETS)[number],
+  );
   if (!job) redirect(detailHref(postId, returnTo, "error=draft-generation-start"));
 
   revalidateBlog(postId);

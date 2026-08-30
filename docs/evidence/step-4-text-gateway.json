@@ -1,14 +1,14 @@
 {
   "model": "qwen2.5:7b",
   "scenario_count": 3,
-  "total_seconds": 24.694963709,
+  "total_seconds": 27.475977000000004,
   "scenarios": [
     {
       "scenario": "hostile-sparse-context",
-      "total_seconds": 12.29011975,
-      "load_seconds": 0.149319875,
-      "prompt_tokens": 393,
-      "output_tokens": 274,
+      "total_seconds": 16.312003042,
+      "load_seconds": 5.535630334,
+      "prompt_tokens": 461,
+      "output_tokens": 204,
       "done_reason": "stop",
       "checks": {
         "structured_draft": true,
@@ -23,8 +23,11 @@
       },
       "draft": {
         "title": "성수 카페 사진 기록",
-        "body": "확인된 사진 정보만 정리한 초안\n\n성수의 카페에 방문했다.\n\n{{IMAGE:1}}\n- 접시 위 케이크: 카페에서 제공하는 케이크는 아름답게 접시 위에 올려져 있다. 케이크의 디자인과 색상은 눈을 즐겁게 한다.\n\n{{IMAGE:2}}\n- 나무 의자와 원형 테이블: 카페 내부는 나무 의자와 원형 테이블로 이루어져 있어 따뜻하고 편안한 분위기를 연출한다. 의자와 테이블은 모두 고급스러운 느낌을 주며, 고객들이 편하게 앉아 커피를 즐길 수 있는 공간을 제공한다.\n\n가격, 웨이팅, 맛, 서비스 평가는 이 글에서는 논외로 두었다. 하지만 이러한 시설과 장소는 카페 방문객들에게 좋은 첫인상을 줄 것으로 기대된다.",
-        "tags": []
+        "body": "성수의 카페에 방문했다. 확인된 사진 정보만 정리한 초안\n\n{{IMAGE:1}}\n- 접시 위 케이크: 카페에서 제공하는 음식 중 하나로, 테이블 위에 놓인 케이크가 보입니다.\n\n{{IMAGE:2}}\n- 나무 의자와 원형 테이블: 카페 내부의 인테리어를 보여줍니다. 나무 의자와 원형 테이블이 배치되어 있어, 따뜻하고 편안한 분위기를 느낄 수 있습니다.\n\n이 카페는 성수 지역에서 찾기 쉬운 곳으로, 다양한 고객들에게 사랑받고 있습니다.",
+        "tags": [
+          "성수",
+          "카페"
+        ]
       },
       "grounding_decision": "REJECT",
       "expected_grounding_decision": "REJECT",
@@ -32,10 +35,10 @@
     },
     {
       "scenario": "exact-grounded-facts",
-      "total_seconds": 5.518452084,
-      "load_seconds": 0.132382459,
-      "prompt_tokens": 438,
-      "output_tokens": 122,
+      "total_seconds": 5.50812975,
+      "load_seconds": 0.12638075,
+      "prompt_tokens": 526,
+      "output_tokens": 98,
       "done_reason": "stop",
       "checks": {
         "structured_draft": true,
@@ -50,8 +53,11 @@
       },
       "draft": {
         "title": "성수 카페 방문 기록",
-        "body": "2026년 8월 20일 목요일에 방문했습니다. 15분 대기 후 케이크를 주문했고, 맛있었습니다.\n\n{{IMAGE:1}}\n- 접시 위의 케이크와 포크가 보입니다.\n\n{{IMAGE:2}}\n- 나무 의자와 원형 테이블이 보입니다.",
-        "tags": []
+        "body": "2026년 8월 20일 목요일에 성수 카페를 방문했습니다. 15분 대기 후 케이크를 주문했고, 맛있었습니다.\n\n{{IMAGE:1}}\n\n{{IMAGE:2}}",
+        "tags": [
+          "성수",
+          "카페"
+        ]
       },
       "grounding_decision": "ACCEPT",
       "expected_grounding_decision": "ACCEPT",
@@ -59,10 +65,10 @@
     },
     {
       "scenario": "three-image-order",
-      "total_seconds": 6.886391875,
-      "load_seconds": 0.128447875,
-      "prompt_tokens": 420,
-      "output_tokens": 154,
+      "total_seconds": 5.655844208,
+      "load_seconds": 0.126508083,
+      "prompt_tokens": 543,
+      "output_tokens": 99,
       "done_reason": "stop",
       "checks": {
         "structured_draft": true,
@@ -77,8 +83,11 @@
       },
       "draft": {
         "title": "전시 공간 사진 기록",
-        "body": "세 장의 사진을 순서대로 설명하는 초안\n\n1. 회색 건물 입구\n   - 건물과 입구가 보입니다.\n\n{{IMAGE:1}}\n\n2. 흰 벽에 걸린 푸른 그림\n   - 흰 벽에 푸른 색의 그림이 걸려 있습니다.\n\n{{IMAGE:2}}\n\n3. 창가의 긴 벤치\n   - 창문과 함께 긴 벤치가 보입니다.\n\n{{IMAGE:3}}",
-        "tags": []
+        "body": "{{IMAGE:1}}\n\n회색 건물의 입구가 보입니다.\n\n{{IMAGE:2}}\n\n흰 벽에 걸린 푸른 그림이 있습니다.\n\n{{IMAGE:3}}\n\n창가에는 긴 벤치가 배치되어 있습니다.",
+        "tags": [
+          "서울",
+          "전시"
+        ]
       },
       "grounding_decision": "ACCEPT",
       "expected_grounding_decision": "ACCEPT",

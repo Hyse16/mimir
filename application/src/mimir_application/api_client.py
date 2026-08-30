@@ -89,6 +89,7 @@ class DraftRevisionTurn:
     base_version_id: str
     result_version_id: str | None
     revision_instruction: str
+    target: str
     error_code: str | None
     created_at: str
     started_at: str | None
@@ -279,6 +280,7 @@ class MimirApiClient:
         post_id: str,
         base_version_id: str,
         revision_instruction: str,
+        target: str = "FULL",
     ) -> AiJob:
         return self._ai_job(self._request(
             "POST",
@@ -286,6 +288,7 @@ class MimirApiClient:
             {
                 "baseVersionId": base_version_id,
                 "revisionInstruction": revision_instruction,
+                "target": target,
             },
         ))
 
@@ -516,6 +519,7 @@ class MimirApiClient:
                 else None
             ),
             revision_instruction=str(payload["revisionInstruction"]),
+            target=str(payload["target"]),
             error_code=str(payload["errorCode"]) if payload["errorCode"] is not None else None,
             created_at=str(payload["createdAt"]),
             started_at=str(payload["startedAt"]) if payload["startedAt"] is not None else None,

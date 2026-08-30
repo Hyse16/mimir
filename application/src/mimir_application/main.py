@@ -85,6 +85,18 @@ def build_app(
         disabled=True,
         key="revision-instruction",
     )
+    revision_target = ft.Dropdown(
+        label="재생성 대상",
+        value="FULL",
+        options=[
+            ft.DropdownOption(key="FULL", text="전체 초안"),
+            ft.DropdownOption(key="TITLE", text="제목만"),
+            ft.DropdownOption(key="BODY", text="본문만"),
+            ft.DropdownOption(key="TAGS", text="태그만"),
+        ],
+        disabled=True,
+        key="revision-target",
+    )
     revision_text = ft.Text(
         "게시글과 이미지 분석을 준비한 뒤 로컬 AI에 수정을 요청할 수 있습니다.",
         color="#5B6470",
@@ -199,6 +211,7 @@ def build_app(
         analysis_text.color = "#5B6470"
         current_draft_job = None
         revision_field.disabled = False
+        revision_target.disabled = False
         revision_button.disabled = False
         revision_refresh_button.disabled = True
         revision_cancel_button.disabled = True
@@ -258,6 +271,7 @@ def build_app(
         current_draft_job = job
         active = job.status in {"WAITING", "RUNNING", "CANCEL_REQUESTED"}
         revision_field.disabled = active
+        revision_target.disabled = active
         revision_button.disabled = active
         revision_refresh_button.disabled = not active
         revision_cancel_button.disabled = job.status not in {"WAITING", "RUNNING"}
@@ -325,6 +339,8 @@ def build_app(
         current_draft_job = None
         revision_field.value = ""
         revision_field.disabled = True
+        revision_target.value = "FULL"
+        revision_target.disabled = True
         revision_field.error_text = None
         revision_button.disabled = True
         revision_refresh_button.disabled = True
@@ -487,6 +503,8 @@ def build_app(
             return
 
         revision_field.error_text = None
+        revision_field.disabled = True
+        revision_target.disabled = True
         revision_button.disabled = True
         revision_text.value = "로컬 AI 수정 작업 요청 중…"
         revision_text.color = "#5B6470"
@@ -494,17 +512,24 @@ def build_app(
         try:
             show_draft_job(
                 client.create_draft_generation_job(
-                    current_post.id, current_post.current_version_id, instruction
+                    current_post.id,
+                    current_post.current_version_id,
+                    instruction,
+                    revision_target.value or "FULL",
                 )
             )
             load_revision_history(current_post)
         except ApiRequestError as error:
             revision_text.value = f"AI 수정 요청 실패: {error}"
             revision_text.color = "#B42318"
+            revision_field.disabled = False
+            revision_target.disabled = False
             revision_button.disabled = False
         except BackendUnavailableError:
             revision_text.value = "AI 수정 요청 실패: 업무 서버에 연결할 수 없습니다."
             revision_text.color = "#B42318"
+            revision_field.disabled = False
+            revision_target.disabled = False
             revision_button.disabled = False
         page.update()
 
@@ -825,6 +850,7 @@ def build_app(
                                 color="#5B6470",
                             ),
                             revision_field,
+                            revision_target,
                             revision_text,
                             revision_history_text,
                             ft.Row(
@@ -897,11 +923,20 @@ def revision_history_document(
             if turn.result_version_id is not None
             else "결과 버전 없음"
         )
-        outcome = f"{turn.status} · {base} → {result}"
+        outcome = f"{turn.status} · {revision_target_label(turn.target)} · {base} → {result}"
         if turn.error_code:
             outcome += f" · {turn.error_code}"
         lines.extend((outcome, turn.revision_instruction, turn.created_at, ""))
     return "\n".join(lines).rstrip()
+
+
+def revision_target_label(target: str) -> str:
+    return {
+        "FULL": "전체",
+        "TITLE": "제목",
+        "BODY": "본문",
+        "TAGS": "태그",
+    }.get(target, target)
 
 
 def run() -> None:

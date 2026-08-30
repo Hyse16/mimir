@@ -269,7 +269,7 @@ def test_starts_draft_generation_from_the_selected_version() -> None:
     }
     with patch("mimir_application.api_client.urlopen", return_value=Response(json.dumps(payload).encode())) as request:
         job = MimirApiClient("http://localhost:8080/api/v1").create_draft_generation_job(
-            "post-1", "version-1", "간결하게 수정해줘"
+            "post-1", "version-1", "간결하게 수정해줘", "TITLE"
         )
 
     sent = request.call_args.args[0]
@@ -277,6 +277,7 @@ def test_starts_draft_generation_from_the_selected_version() -> None:
     assert json.loads(sent.data) == {
         "baseVersionId": "version-1",
         "revisionInstruction": "간결하게 수정해줘",
+        "target": "TITLE",
     }
     assert job.job_type == "BLOG_DRAFT_GENERATION"
 
@@ -290,6 +291,7 @@ def test_reads_persisted_draft_revision_turns() -> None:
             "baseVersionId": "version-2",
             "resultVersionId": None,
             "revisionInstruction": "더 간결하게",
+            "target": "BODY",
             "errorCode": "TEXT_GENERATION_FAILED",
             "createdAt": "2026-08-27T10:00:00Z",
             "startedAt": "2026-08-27T10:00:01Z",
@@ -308,6 +310,7 @@ def test_reads_persisted_draft_revision_turns() -> None:
     )
     assert history.total_items == 1
     assert history.items[0].revision_instruction == "더 간결하게"
+    assert history.items[0].target == "BODY"
     assert history.items[0].error_code == "TEXT_GENERATION_FAILED"
 
 

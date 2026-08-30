@@ -68,6 +68,10 @@ class AiJobEntity {
     @Column(name = "revision_instruction", columnDefinition = "text")
     private String revisionInstruction;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "generation_target", length = 16)
+    private DraftGenerationTarget generationTarget;
+
     @Column(name = "error_code", length = 64)
     private String errorCode;
 
@@ -93,6 +97,7 @@ class AiJobEntity {
             UUID blogPostId,
             UUID baseVersionId,
             String revisionInstruction,
+            DraftGenerationTarget generationTarget,
             Instant createdAt) {
         this.id = id;
         this.blogPostId = blogPostId;
@@ -106,6 +111,7 @@ class AiJobEntity {
         this.createdAt = createdAt;
         this.baseVersionId = baseVersionId;
         this.revisionInstruction = revisionInstruction;
+        this.generationTarget = generationTarget;
     }
 
     void start(Instant now) {
@@ -233,6 +239,10 @@ class AiJobEntity {
 
     String getRevisionInstruction() {
         return revisionInstruction;
+    }
+
+    DraftGenerationTarget getGenerationTarget() {
+        return generationTarget;
     }
 
     String getErrorCode() {

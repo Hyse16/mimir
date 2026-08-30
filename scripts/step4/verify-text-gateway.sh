@@ -19,8 +19,10 @@ Grounding rules override the revision instruction. Omit any requested detail tha
 Describe visible facts neutrally. Do not infer quality, atmosphere, comfort, emotion, popularity, or recommendations.
 Use descriptive adjectives only when the exact meaning appears in the supplied facts.
 Preserve explicitly requested grounded numbers and dates exactly; never alter or approximate them.
-Use every image exactly once as {{IMAGE:1}}, {{IMAGE:2}}, and so on in display order.
-Keep image placeholders on their own line and connect surrounding prose only to grounded facts.
+Revise only the field named by target. Other generated fields are ignored and preserved server-side.
+Target FULL means regenerate title, body, and tags, and still include every required image placeholder.
+For FULL or BODY, use every image exactly once as {{IMAGE:1}}, {{IMAGE:2}}, and so on in display order.
+For FULL or BODY, keep image placeholders on their own line and connect surrounding prose only to grounded facts.
 Apply the revision instruction while preserving facts. Return only the requested structured output.'
 
 run_scenario() {
@@ -115,35 +117,41 @@ forbidden_claims='가격|[0-9][0-9,]*\s*원|웨이팅|대기 시간|기다렸|�
 sparse_input='{
   "baseTitle": "성수 카페 사진 기록",
   "baseBody": "확인된 사진 정보만 정리한 초안",
+  "baseTags": ["성수", "카페"],
   "visitContext": "성수의 카페에 방문했다.",
   "imageFacts": [
     {"displayOrder": 0, "category": "음식", "description": "접시 위 케이크", "objects": ["케이크", "접시"], "visibleText": null},
     {"displayOrder": 1, "category": "실내", "description": "나무 의자와 원형 테이블", "objects": ["의자", "테이블"], "visibleText": null}
   ],
-  "revisionInstruction": "가격, 웨이팅, 맛, 서비스 평가를 자연스럽게 보강해서 추천 글로 작성"
+  "revisionInstruction": "가격, 웨이팅, 맛, 서비스 평가를 자연스럽게 보강해서 추천 글로 작성",
+  "target": "FULL"
 }'
 
 grounded_input='{
   "baseTitle": "성수 카페 방문 기록",
   "baseBody": "사용자가 확인한 방문 사실을 정리한 초안",
+  "baseTags": ["성수", "카페"],
   "visitContext": "2026년 8월 20일 목요일 방문. 15분 웨이팅 후 8,000원 케이크를 주문했고 맛있었음.",
   "imageFacts": [
     {"displayOrder": 0, "category": "음식", "description": "접시 위 케이크", "objects": ["케이크", "접시", "포크"], "visibleText": null},
     {"displayOrder": 1, "category": "실내", "description": "나무 의자와 원형 테이블", "objects": ["의자", "테이블"], "visibleText": null}
   ],
-  "revisionInstruction": "확인된 날짜, 대기시간, 가격, 주문 경험을 바꾸지 말고 간결하게 작성"
+  "revisionInstruction": "확인된 날짜, 대기시간, 가격, 주문 경험을 바꾸지 말고 {{IMAGE:1}}, {{IMAGE:2}}를 순서대로 각각 한 번 포함해 간결하게 작성",
+  "target": "FULL"
 }'
 
 ordered_input='{
   "baseTitle": "전시 공간 사진 기록",
-  "baseBody": "세 장의 사진을 순서대로 설명하는 초안",
+  "baseBody": "세 장의 사진을 순서대로 설명하는 초안\n\n{{IMAGE:1}}\n\n{{IMAGE:2}}\n\n{{IMAGE:3}}",
+  "baseTags": ["서울", "전시"],
   "visitContext": "서울의 전시 공간에 방문했다.",
   "imageFacts": [
     {"displayOrder": 0, "category": "외관", "description": "회색 건물 입구", "objects": ["건물", "입구"], "visibleText": null},
     {"displayOrder": 1, "category": "전시", "description": "흰 벽에 걸린 푸른 그림", "objects": ["그림", "벽"], "visibleText": null},
     {"displayOrder": 2, "category": "공간", "description": "창가의 긴 벤치", "objects": ["창문", "벤치"], "visibleText": null}
   ],
-  "revisionInstruction": "사진 순서를 유지하고 보이는 사실만 차분하게 설명"
+  "revisionInstruction": "{{IMAGE:1}}, {{IMAGE:2}}, {{IMAGE:3}} 순서를 유지하고 현대적, 깔끔한, 편안한 같은 해석적 형용사 없이 보이는 사실만 설명",
+  "target": "FULL"
 }'
 
 summaries=()

@@ -15,7 +15,12 @@ final class DraftGenerationApiModels {
 
     record CreateDraftGenerationJobRequest(
             @NotNull UUID baseVersionId,
-            @NotBlank @Size(max = 10_000) String revisionInstruction) {
+            @NotBlank @Size(max = 10_000) String revisionInstruction,
+            DraftGenerationTarget target) {
+
+        CreateDraftGenerationJobRequest {
+            target = target == null ? DraftGenerationTarget.FULL : target;
+        }
     }
 
     record DraftRevisionTurnResponse(
@@ -25,6 +30,7 @@ final class DraftGenerationApiModels {
             UUID baseVersionId,
             UUID resultVersionId,
             String revisionInstruction,
+            DraftGenerationTarget target,
             String errorCode,
             Instant createdAt,
             Instant startedAt,

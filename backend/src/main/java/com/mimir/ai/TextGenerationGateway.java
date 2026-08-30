@@ -9,13 +9,24 @@ public interface TextGenerationGateway {
     record DraftGenerationRequest(
             String baseTitle,
             String baseBody,
+            List<String> baseTags,
             String visitContext,
             List<ImageFact> imageFacts,
-            String revisionInstruction) {
+            String revisionInstruction,
+            DraftTarget target) {
 
         public DraftGenerationRequest {
+            baseTags = baseTags == null ? List.of() : List.copyOf(baseTags);
             imageFacts = imageFacts == null ? List.of() : List.copyOf(imageFacts);
+            target = target == null ? DraftTarget.FULL : target;
         }
+    }
+
+    enum DraftTarget {
+        FULL,
+        TITLE,
+        BODY,
+        TAGS
     }
 
     record ImageFact(

@@ -100,7 +100,7 @@ def job(status: str, stage: str, *, result_version_id: str | None = None) -> AiJ
 
 class FakeApiClient:
     def __init__(self) -> None:
-        self.created_with: tuple[str, str, str] | None = None
+        self.created_with: tuple[str, str, str, str] | None = None
         self.selected_version_id: str | None = None
         self.detail = post(1)
         self.polled_job = job("COMPLETED", "COMPLETE", result_version_id="version-2")
@@ -112,9 +112,13 @@ class FakeApiClient:
         return self.detail
 
     def create_draft_generation_job(
-        self, post_id: str, base_version_id: str, instruction: str
+        self,
+        post_id: str,
+        base_version_id: str,
+        instruction: str,
+        target: str = "FULL",
     ) -> AiJob:
-        self.created_with = (post_id, base_version_id, instruction)
+        self.created_with = (post_id, base_version_id, instruction, target)
         return job("WAITING", "QUEUED")
 
     def get_ai_job(self, _: str) -> AiJob:
@@ -138,6 +142,7 @@ class FakeApiClient:
                 base_version_id="version-1",
                 result_version_id="version-2",
                 revision_instruction="더 간결하게",
+                target="FULL",
                 error_code=None,
                 created_at="2026-08-27T10:00:00Z",
                 started_at="2026-08-27T10:00:01Z",
@@ -171,12 +176,14 @@ def test_starts_revision_and_loads_completed_version_on_refresh() -> None:
     instruction.value = "  더 간결하게 다듬어줘  "
     find_control(root, key="start-revision").on_click(None)
 
-    assert client.created_with == ("post-1", "version-1", "더 간결하게 다듬어줘")
+    assert client.created_with == ("post-1", "version-1", "더 간결하게 다듬어줘", "FULL")
+    assert find_control(root, key="revision-target").disabled is True
     assert find_control(root, key="refresh-revision").disabled is False
 
     find_control(root, key="refresh-revision").on_click(None)
 
     assert find_control(root, key="blog-body").value == "본문 2"
+    assert find_control(root, key="revision-target").disabled is False
     assert find_control(root, key="revision-status").value == "수정 완료 · 버전 2를 불러왔습니다."
 
 
@@ -268,6 +275,18 @@ def test_shows_persisted_revision_turn_without_exposing_job_id() -> None:
     root = load_post(page, client)
 
     history = find_control(root, key="revision-history").value
-    assert "COMPLETED · v1 → v2" in history
+    assert "COMPLETED · 전체 · v1 → v2" in history
     assert "더 간결하게" in history
     assert "job-1" not in history
+
+
+def test_sends_selected_partial_revision_target() -> None:
+    page = FakePage()
+    client = FakeApiClient()
+    root = load_post(page, client)
+    find_control(root, key="revision-target").value = "TAGS"
+    find_control(root, key="revision-instruction").value = "태그만 정리해줘"
+
+    find_control(root, key="start-revision").on_click(None)
+
+    assert client.created_with == ("post-1", "version-1", "태그만 정리해줘", "TAGS")

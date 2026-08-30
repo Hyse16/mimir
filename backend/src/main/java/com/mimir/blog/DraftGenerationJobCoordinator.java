@@ -27,8 +27,12 @@ class DraftGenerationJobCoordinator {
         this.taskExecutor = taskExecutor;
     }
 
-    AiJobResponse create(UUID postId, UUID baseVersionId, String revisionInstruction) {
-        UUID jobId = service.create(postId, baseVersionId, revisionInstruction);
+    AiJobResponse create(
+            UUID postId,
+            UUID baseVersionId,
+            String revisionInstruction,
+            DraftGenerationTarget target) {
+        UUID jobId = service.create(postId, baseVersionId, revisionInstruction, target);
         taskExecutor.execute(() -> runner.run(jobId));
         return queryService.detail(jobId);
     }

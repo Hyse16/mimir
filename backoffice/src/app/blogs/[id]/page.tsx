@@ -158,6 +158,15 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
         <form action={draftGenerationAction} className="draftForm">
           <input name="baseVersionId" type="hidden" value={post.currentVersionId} />
           <label>
+            <span>수정 대상</span>
+            <select defaultValue="FULL" name="target">
+              <option value="FULL">전체</option>
+              <option value="TITLE">제목만</option>
+              <option value="BODY">본문만</option>
+              <option value="TAGS">태그만</option>
+            </select>
+          </label>
+          <label>
             <span>수정 지시</span>
             <textarea
               defaultValue="사실은 유지하고 편안한 존댓말의 네이버 블로그 글로 다듬어줘."
@@ -204,7 +213,7 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
             {revisionHistory.items.map((turn) => (
               <li key={turn.id}>
                 <div className="revisionTurnMeta">
-                  <strong>{revisionStatusLabel(turn.status)}</strong>
+                  <strong>{revisionStatusLabel(turn.status)} · {revisionTargetLabel(turn.target)}</strong>
                   <span>{versionLabel(post.versions, turn.baseVersionId)} → {versionLabel(post.versions, turn.resultVersionId)}</span>
                   <time dateTime={turn.createdAt}>{formatDate(turn.createdAt)}</time>
                 </div>
@@ -396,6 +405,15 @@ function revisionStatusLabel(status: string) {
     FAILED: "실패",
     CANCELLED: "취소됨",
   } as Record<string, string>)[status] ?? status;
+}
+
+function revisionTargetLabel(target: string) {
+  return ({
+    FULL: "전체",
+    TITLE: "제목",
+    BODY: "본문",
+    TAGS: "태그",
+  } as Record<string, string>)[target] ?? target;
 }
 
 function safeReturnTo(value: string | undefined) {

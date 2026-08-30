@@ -93,11 +93,15 @@ export type DraftRevisionTurn = {
   baseVersionId: string;
   resultVersionId: string | null;
   revisionInstruction: string;
+  target: DraftGenerationTarget;
   errorCode: string | null;
   createdAt: string;
   startedAt: string | null;
   completedAt: string | null;
 };
+
+export const DRAFT_GENERATION_TARGETS = ["FULL", "TITLE", "BODY", "TAGS"] as const;
+export type DraftGenerationTarget = (typeof DRAFT_GENERATION_TARGETS)[number];
 
 export type DraftRevisionTurnPage = {
   items: DraftRevisionTurn[];
@@ -283,6 +287,7 @@ function isDraftRevisionTurn(value: unknown): value is DraftRevisionTurn {
     typeof value.baseVersionId === "string" &&
     (typeof value.resultVersionId === "string" || value.resultVersionId === null) &&
     typeof value.revisionInstruction === "string" &&
+    DRAFT_GENERATION_TARGETS.includes(value.target as DraftGenerationTarget) &&
     (typeof value.errorCode === "string" || value.errorCode === null) &&
     typeof value.createdAt === "string" &&
     (typeof value.startedAt === "string" || value.startedAt === null) &&
@@ -450,10 +455,12 @@ export async function createDraftGenerationJob(
   postId: string,
   baseVersionId: string,
   revisionInstruction: string,
+  target: DraftGenerationTarget,
 ): Promise<AiJob | null> {
   const payload = await sendJson(`/blog-posts/${encodeURIComponent(postId)}/draft-generation-jobs`, "POST", {
     baseVersionId,
     revisionInstruction,
+    target,
   });
   return isAiJob(payload) ? payload : null;
 }

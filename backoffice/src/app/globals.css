@@ -345,6 +345,7 @@ h1 {
 .filterBar select,
 .draftForm input,
 .draftForm textarea,
+.draftForm select,
 .statusForm select {
   width: 100%;
   min-height: 40px;
@@ -359,6 +360,7 @@ h1 {
 .filterBar select:focus-visible,
 .draftForm input:focus-visible,
 .draftForm textarea:focus-visible,
+.draftForm select:focus-visible,
 .statusForm select:focus-visible,
 .actionButton:focus-visible,
 .primaryButton:focus-visible {

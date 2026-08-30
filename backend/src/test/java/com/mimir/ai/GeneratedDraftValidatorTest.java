@@ -8,6 +8,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import com.mimir.ai.TextGenerationGateway.DraftGenerationRequest;
+import com.mimir.ai.TextGenerationGateway.DraftTarget;
 import com.mimir.ai.TextGenerationGateway.GeneratedDraft;
 import com.mimir.ai.TextGenerationGateway.ImageFact;
 
@@ -151,14 +152,63 @@ class GeneratedDraftValidatorTest {
                 .hasMessageContaining("display order");
     }
 
+    @Test
+    void titleTargetPreservesBodyAndTagsAndIgnoresDiscardedClaims() {
+        GeneratedDraft validated = validator.validate(request("", DraftTarget.TITLE), new GeneratedDraft(
+                "간결한 새 제목",
+                "8,000원이고 맛있었어요.",
+                List.of("추천")));
+
+        assertThat(validated.title()).isEqualTo("간결한 새 제목");
+        assertThat(validated.body()).isEqualTo("기존 본문");
+        assertThat(validated.tags()).containsExactly("기존태그");
+    }
+
+    @Test
+    void bodyTargetPreservesTitleAndTagsWhileRequiringImageOrder() {
+        GeneratedDraft validated = validator.validate(request("", DraftTarget.BODY), new GeneratedDraft(
+                "무시할 제목",
+                "{{IMAGE:1}}\n케이크 사진입니다.\n{{IMAGE:2}}\n실내 사진입니다.",
+                List.of("무시할태그")));
+
+        assertThat(validated.title()).isEqualTo("기존 제목");
+        assertThat(validated.body()).contains("{{IMAGE:1}}", "{{IMAGE:2}}");
+        assertThat(validated.tags()).containsExactly("기존태그");
+    }
+
+    @Test
+    void tagsTargetPreservesTitleAndBodyAndGroundsGeneratedTags() {
+        GeneratedDraft validated = validator.validate(request("성수 방문", DraftTarget.TAGS), new GeneratedDraft(
+                "무시할 제목",
+                "8,000원이고 맛있었어요.",
+                List.of("#성수", "성수")));
+
+        assertThat(validated.title()).isEqualTo("기존 제목");
+        assertThat(validated.body()).isEqualTo("기존 본문");
+        assertThat(validated.tags()).containsExactly("성수");
+
+        assertThatThrownBy(() -> validator.validate(request("", DraftTarget.TAGS), new GeneratedDraft(
+                "무시할 제목",
+                "무시할 본문",
+                List.of("추천"))))
+                .isInstanceOf(TextGenerationException.class)
+                .hasMessageContaining("experience");
+    }
+
     private DraftGenerationRequest request(String context) {
+        return request(context, DraftTarget.FULL);
+    }
+
+    private DraftGenerationRequest request(String context, DraftTarget target) {
         return new DraftGenerationRequest(
                 "기존 제목",
                 "기존 본문",
+                List.of("기존태그"),
                 context,
                 List.of(
                         new ImageFact(0, "음식", "접시 위 케이크", List.of("케이크", "접시"), null),
                         new ImageFact(1, "실내", "카페 실내", List.of("테이블", "의자"), null)),
-                "편안한 존댓말로 수정");
+                "편안한 존댓말로 수정",
+                target);
     }
 }

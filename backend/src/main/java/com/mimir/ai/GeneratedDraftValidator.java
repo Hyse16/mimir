@@ -13,6 +13,7 @@ import java.util.stream.IntStream;
 import org.springframework.stereotype.Component;
 
 import com.mimir.ai.TextGenerationGateway.DraftGenerationRequest;
+import com.mimir.ai.TextGenerationGateway.DraftTarget;
 import com.mimir.ai.TextGenerationGateway.GeneratedDraft;
 
 @Component
@@ -39,22 +40,44 @@ public class GeneratedDraftValidator {
             List.of("재방문", "다시 방문", "또 가고"));
 
     public GeneratedDraft validate(DraftGenerationRequest request, GeneratedDraft draft) {
-        String title = required(draft.title(), "Generated title is required.");
-        String body = required(draft.body(), "Generated body is required.");
+        DraftTarget target = request.target();
+        String title = target == DraftTarget.FULL || target == DraftTarget.TITLE
+                ? required(draft.title(), "Generated title is required.")
+                : request.baseTitle();
+        String body = target == DraftTarget.FULL || target == DraftTarget.BODY
+                ? required(draft.body(), "Generated body is required.")
+                : request.baseBody();
+        List<String> tags = target == DraftTarget.FULL || target == DraftTarget.TAGS
+                ? normalizedTags(draft.tags())
+                : request.baseTags();
         if (title.length() > 200 || body.length() > 100_000) {
             throw new TextGenerationException("Generated draft exceeds the supported length.");
         }
-        List<String> tags = draft.tags().stream()
+        if (tags.size() > 30 || tags.stream().anyMatch(tag -> tag.length() > 50)) {
+            throw new TextGenerationException("Generated tags exceed the supported boundary.");
+        }
+        if (target == DraftTarget.FULL || target == DraftTarget.BODY) {
+            requireOrderedPlaceholders(body, request.imageFacts().size());
+        }
+        requireGroundedClaims(generatedContent(target, title, body, tags), request.visitContext());
+        return new GeneratedDraft(title, body, tags);
+    }
+
+    private List<String> normalizedTags(List<String> tags) {
+        return tags.stream()
                 .map(this::normalizeTag)
                 .filter(value -> !value.isEmpty())
                 .distinct()
                 .toList();
-        if (tags.size() > 30 || tags.stream().anyMatch(tag -> tag.length() > 50)) {
-            throw new TextGenerationException("Generated tags exceed the supported boundary.");
-        }
-        requireOrderedPlaceholders(body, request.imageFacts().size());
-        requireGroundedClaims(title + "\n" + body, request.visitContext());
-        return new GeneratedDraft(title, body, tags);
+    }
+
+    private String generatedContent(DraftTarget target, String title, String body, List<String> tags) {
+        return switch (target) {
+            case FULL -> title + "\n" + body + "\n" + String.join(" ", tags);
+            case TITLE -> title;
+            case BODY -> body;
+            case TAGS -> String.join(" ", tags);
+        };
     }
 
     private void requireOrderedPlaceholders(String body, int imageCount) {
