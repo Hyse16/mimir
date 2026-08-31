@@ -23,6 +23,9 @@ class AiJobEntity {
     @Column(name = "parent_job_id")
     private UUID parentJobId;
 
+    @Column(name = "previous_turn_id")
+    private UUID previousTurnId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "job_type", nullable = false, length = 32)
     private AiJobType jobType;
@@ -98,6 +101,7 @@ class AiJobEntity {
             UUID baseVersionId,
             String revisionInstruction,
             DraftGenerationTarget generationTarget,
+            UUID previousTurnId,
             Instant createdAt) {
         this.id = id;
         this.blogPostId = blogPostId;
@@ -112,6 +116,7 @@ class AiJobEntity {
         this.baseVersionId = baseVersionId;
         this.revisionInstruction = revisionInstruction;
         this.generationTarget = generationTarget;
+        this.previousTurnId = previousTurnId;
     }
 
     void start(Instant now) {
@@ -183,6 +188,10 @@ class AiJobEntity {
 
     UUID getParentJobId() {
         return parentJobId;
+    }
+
+    UUID getPreviousTurnId() {
+        return previousTurnId;
     }
 
     AiJobType getJobType() {

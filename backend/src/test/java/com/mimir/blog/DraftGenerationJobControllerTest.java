@@ -41,7 +41,7 @@ class DraftGenerationJobControllerTest {
                 .andExpect(status().isAccepted());
 
         verify(coordinator).create(
-                postId, baseVersionId, "전체 초안을 다듬어줘", DraftGenerationTarget.FULL);
+                postId, baseVersionId, "전체 초안을 다듬어줘", DraftGenerationTarget.FULL, null);
     }
 
     @Test
@@ -61,7 +61,28 @@ class DraftGenerationJobControllerTest {
                 .andExpect(status().isAccepted());
 
         verify(coordinator).create(
-                postId, baseVersionId, "제목만 바꿔줘", DraftGenerationTarget.TITLE);
+                postId, baseVersionId, "제목만 바꿔줘", DraftGenerationTarget.TITLE, null);
+    }
+
+    @Test
+    void passesPreviousTurnIdToCoordinator() throws Exception {
+        UUID postId = UUID.randomUUID();
+        UUID baseVersionId = UUID.randomUUID();
+        UUID previousTurnId = UUID.randomUUID();
+
+        mockMvc.perform(post("/api/v1/blog-posts/{postId}/draft-generation-jobs", postId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "baseVersionId": "%s",
+                                  "revisionInstruction": "직전 요청을 이어서 다듬어줘",
+                                  "previousTurnId": "%s"
+                                }
+                                """.formatted(baseVersionId, previousTurnId)))
+                .andExpect(status().isAccepted());
+
+        verify(coordinator).create(postId, baseVersionId, "직전 요청을 이어서 다듬어줘",
+                DraftGenerationTarget.FULL, previousTurnId);
     }
 
     @Test

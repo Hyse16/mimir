@@ -13,6 +13,7 @@ public interface TextGenerationGateway {
             String visitContext,
             List<ImageFact> imageFacts,
             String revisionInstruction,
+            String previousRevisionInstruction,
             DraftTarget target) {
 
         public DraftGenerationRequest {

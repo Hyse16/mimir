@@ -26,6 +26,7 @@ def build_app(
     current_post: BlogPostDetail | None = None
     current_analysis_job: AiJob | None = None
     current_draft_job: AiJob | None = None
+    revision_turns: tuple[DraftRevisionTurn, ...] = ()
     selected_images: list[ImageUpload] = []
 
     page.title = "Mimir"
@@ -312,7 +313,7 @@ def build_app(
         page.update()
 
     def start_new(_: ft.ControlEvent) -> None:
-        nonlocal current_post, current_analysis_job, current_draft_job
+        nonlocal current_post, current_analysis_job, current_draft_job, revision_turns
         current_post = None
         post_selector.value = None
         post_selector.error_text = None
@@ -337,6 +338,7 @@ def build_app(
         analysis_text.value = "이미지 업로드 후 구조화 분석을 시작할 수 있습니다."
         analysis_text.color = "#5B6470"
         current_draft_job = None
+        revision_turns = ()
         revision_field.value = ""
         revision_field.disabled = True
         revision_target.value = "FULL"
@@ -516,6 +518,10 @@ def build_app(
                     current_post.current_version_id,
                     instruction,
                     revision_target.value or "FULL",
+                    previous_revision_turn_id(
+                        revision_turns,
+                        current_post.current_version_id,
+                    ),
                 )
             )
             load_revision_history(current_post)
@@ -575,11 +581,14 @@ def build_app(
     revision_cancel_button.on_click = cancel_revision
 
     def load_revision_history(post: BlogPostDetail) -> None:
+        nonlocal revision_turns
         try:
             history = client.get_draft_revision_turns(post.id)
+            revision_turns = history.items
             revision_history_text.value = revision_history_document(post, history.items)
             revision_history_refresh_button.disabled = False
         except (ApiRequestError, BackendUnavailableError):
+            revision_turns = ()
             revision_history_text.value = "AI 수정 이력을 불러오지 못했습니다."
             revision_history_refresh_button.disabled = False
 
@@ -915,6 +924,7 @@ def revision_history_document(
         version.id: f"v{version.version_number}"
         for version in post.versions
     }
+    turns_by_id = {turn.id: turn for turn in turns}
     lines: list[str] = []
     for turn in turns:
         base = version_labels.get(turn.base_version_id, "기준 버전 없음")
@@ -926,8 +936,37 @@ def revision_history_document(
         outcome = f"{turn.status} · {revision_target_label(turn.target)} · {base} → {result}"
         if turn.error_code:
             outcome += f" · {turn.error_code}"
-        lines.extend((outcome, turn.revision_instruction, turn.created_at, ""))
+        lines.extend((outcome, turn.revision_instruction))
+        if turn.previous_turn_id is not None:
+            previous = turns_by_id.get(turn.previous_turn_id)
+            if previous is None:
+                lines.append(f"이전 요청에서 이어짐 · {base} 결과")
+            else:
+                previous_base = version_labels.get(previous.base_version_id, "기준 버전 없음")
+                previous_result = (
+                    version_labels.get(previous.result_version_id, "결과 버전 없음")
+                    if previous.result_version_id is not None
+                    else "결과 버전 없음"
+                )
+                lines.append(
+                    f"이전 요청에서 이어짐 · {previous_base} → {previous_result} · {previous.revision_instruction}",
+                )
+        lines.extend((turn.created_at, ""))
     return "\n".join(lines).rstrip()
+
+
+def previous_revision_turn_id(
+    turns: tuple[DraftRevisionTurn, ...],
+    base_version_id: str,
+) -> str | None:
+    return next(
+        (
+            turn.id
+            for turn in turns
+            if turn.status == "COMPLETED" and turn.result_version_id == base_version_id
+        ),
+        None,
+    )
 
 
 def revision_target_label(target: str) -> str:

@@ -65,7 +65,7 @@ class DraftGenerationJobService {
 
     @Transactional
     public UUID create(UUID postId, UUID baseVersionId, String revisionInstruction) {
-        return create(postId, baseVersionId, revisionInstruction, DraftGenerationTarget.FULL);
+        return create(postId, baseVersionId, revisionInstruction, DraftGenerationTarget.FULL, null);
     }
 
     @Transactional
@@ -74,6 +74,16 @@ class DraftGenerationJobService {
             UUID baseVersionId,
             String revisionInstruction,
             DraftGenerationTarget target) {
+        return create(postId, baseVersionId, revisionInstruction, target, null);
+    }
+
+    @Transactional
+    public UUID create(
+            UUID postId,
+            UUID baseVersionId,
+            String revisionInstruction,
+            DraftGenerationTarget target,
+            UUID previousTurnId) {
         if (baseVersionId == null || revisionInstruction == null || revisionInstruction.isBlank()) {
             throw new IllegalArgumentException("Base version and revision instruction are required.");
         }
@@ -87,11 +97,14 @@ class DraftGenerationJobService {
         if (!baseVersionId.equals(post.getCurrentVersionId())) {
             throw new StaleDraftVersionException();
         }
+        if (previousTurnId != null) {
+            validatePreviousTurn(previousTurnId, postId, baseVersionId);
+        }
         requireNoActiveJob(postId);
         requireImageFacts(postId);
         Instant now = clock.instant();
         AiJobEntity job = jobRepository.save(new AiJobEntity(
-                UUID.randomUUID(), postId, baseVersionId, revisionInstruction.strip(), target, now));
+                UUID.randomUUID(), postId, baseVersionId, revisionInstruction.strip(), target, previousTurnId, now));
         recordEvent(job, now);
         return job.getId();
     }
@@ -155,6 +168,7 @@ class DraftGenerationJobService {
                 context.getVisitContext(),
                 imageFacts,
                 job.getRevisionInstruction(),
+                previousRevisionInstruction(job),
                 job.getGenerationTarget().toGatewayTarget());
     }
 
@@ -243,7 +257,34 @@ class DraftGenerationJobService {
                 context.getVisitContext(),
                 requireImageFacts(job.getBlogPostId()),
                 job.getRevisionInstruction(),
+                previousRevisionInstruction(job),
                 job.getGenerationTarget().toGatewayTarget());
+    }
+
+    private String previousRevisionInstruction(AiJobEntity job) {
+        if (job.getPreviousTurnId() == null) {
+            return null;
+        }
+        return jobRepository.findById(job.getPreviousTurnId())
+                .map(AiJobEntity::getRevisionInstruction)
+                .orElseThrow(() -> new InvalidAiJobOperationException("The previous revision turn is unavailable."));
+    }
+
+    private void validatePreviousTurn(UUID previousTurnId, UUID postId, UUID baseVersionId) {
+        AiJobEntity previous = jobRepository.findById(previousTurnId)
+                .orElseThrow(() -> new AiJobNotFoundException(previousTurnId));
+        if (previous.getJobType() != AiJobType.BLOG_DRAFT_GENERATION) {
+            throw new InvalidAiJobOperationException("The previous turn must be a draft generation job.");
+        }
+        if (!previous.getBlogPostId().equals(postId)) {
+            throw new InvalidAiJobOperationException("The previous turn must belong to the same blog post.");
+        }
+        if (previous.getStatus() != AiJobStatus.COMPLETED || previous.getResultVersionId() == null) {
+            throw new InvalidAiJobOperationException("The previous turn must be completed with a result version.");
+        }
+        if (!previous.getResultVersionId().equals(baseVersionId)) {
+            throw new InvalidAiJobOperationException("The previous turn result must be the new turn base version.");
+        }
     }
 
     private void requireNoActiveJob(UUID postId) {
@@ -277,6 +318,7 @@ class DraftGenerationJobService {
                 job.getId(),
                 job.getStatus(),
                 job.getStage(),
+                job.getPreviousTurnId(),
                 job.getBaseVersionId(),
                 job.getResultVersionId(),
                 job.getRevisionInstruction(),

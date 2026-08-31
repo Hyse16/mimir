@@ -21,6 +21,8 @@ import {
   getAiJob,
   getBlogPost,
   getDraftRevisionTurns,
+  previousRevisionTurnId,
+  type DraftRevisionTurn,
   type DraftVersion,
 } from "@/lib/mimir-api";
 
@@ -61,6 +63,10 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
   const statusAction = updateBlogStatusAction.bind(null, post.id, returnTo);
   const analysisAction = startImageAnalysisAction.bind(null, post.id, returnTo);
   const draftGenerationAction = startDraftGenerationAction.bind(null, post.id, returnTo);
+  const previousTurnId = previousRevisionTurnId(
+    revisionHistory?.items ?? [],
+    post.currentVersionId,
+  );
   const assetIds = post.assets.map((asset) => asset.id);
   const uploadAction = `/api/blog-posts/${encodeURIComponent(post.id)}/assets?returnTo=${encodeURIComponent(returnTo)}`;
   const notice = single(query.notice);
@@ -157,6 +163,7 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
         </div>
         <form action={draftGenerationAction} className="draftForm">
           <input name="baseVersionId" type="hidden" value={post.currentVersionId} />
+          {previousTurnId && <input name="previousTurnId" type="hidden" value={previousTurnId} />}
           <label>
             <span>수정 대상</span>
             <select defaultValue="FULL" name="target">
@@ -218,6 +225,9 @@ export default async function BlogDetailPage({ params, searchParams }: DetailPag
                   <time dateTime={turn.createdAt}>{formatDate(turn.createdAt)}</time>
                 </div>
                 <p>{turn.revisionInstruction}</p>
+                {turn.previousTurnId && (
+                  <small>{linkedTurnSummary(turn, revisionHistory.items, post.versions)}</small>
+                )}
                 {turn.errorCode && <small>오류 코드: {turn.errorCode}</small>}
               </li>
             ))}
@@ -394,6 +404,18 @@ function versionLabel(versions: DraftVersion[], versionId: string | null) {
   if (versionId === null) return "결과 없음";
   const version = versions.find((candidate) => candidate.id === versionId);
   return version ? `v${version.versionNumber}` : "버전 없음";
+}
+
+function linkedTurnSummary(
+  turn: DraftRevisionTurn,
+  turns: DraftRevisionTurn[],
+  versions: DraftVersion[],
+) {
+  const previous = turns.find((candidate) => candidate.id === turn.previousTurnId);
+  if (!previous) {
+    return `이전 요청에서 이어짐 · ${versionLabel(versions, turn.baseVersionId)} 결과`;
+  }
+  return `이전 요청에서 이어짐 · ${versionLabel(versions, previous.baseVersionId)} → ${versionLabel(versions, previous.resultVersionId)} · ${previous.revisionInstruction}`;
 }
 
 function revisionStatusLabel(status: string) {

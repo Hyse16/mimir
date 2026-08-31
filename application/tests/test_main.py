@@ -45,11 +45,16 @@ def find_control(control: Any, *, key: str) -> Any:
     return None
 
 
-def version(number: int, *, selected: bool = True) -> DraftVersion:
+def version(
+    number: int,
+    *,
+    selected: bool = True,
+    source: str | None = None,
+) -> DraftVersion:
     return DraftVersion(
         id=f"version-{number}",
         version_number=number,
-        source="AI_GENERATED" if number > 1 else "USER_EDIT",
+        source=source or ("AI_GENERATED" if number > 1 else "USER_EDIT"),
         title="서울 산책",
         body=f"본문 {number}",
         tags=("서울",),
@@ -58,11 +63,20 @@ def version(number: int, *, selected: bool = True) -> DraftVersion:
     )
 
 
-def post(number: int, *, total_versions: int | None = None) -> BlogPostDetail:
+def post(
+    number: int,
+    *,
+    total_versions: int | None = None,
+    current_source: str | None = None,
+) -> BlogPostDetail:
     total = total_versions or number
-    current = version(number)
+    current = version(number, source=current_source)
     versions = tuple(
-        version(candidate, selected=candidate == number)
+        version(
+            candidate,
+            selected=candidate == number,
+            source=current_source if candidate == number else None,
+        )
         for candidate in range(total, 0, -1)
     )
     return BlogPostDetail(
@@ -100,10 +114,24 @@ def job(status: str, stage: str, *, result_version_id: str | None = None) -> AiJ
 
 class FakeApiClient:
     def __init__(self) -> None:
-        self.created_with: tuple[str, str, str, str] | None = None
+        self.created_with: tuple[str, str, str, str, str | None] | None = None
         self.selected_version_id: str | None = None
         self.detail = post(1)
         self.polled_job = job("COMPLETED", "COMPLETE", result_version_id="version-2")
+        self.revision_turns = (DraftRevisionTurn(
+            id="job-1",
+            previous_turn_id=None,
+            status="COMPLETED",
+            stage="COMPLETE",
+            base_version_id="version-1",
+            result_version_id="version-2",
+            revision_instruction="더 간결하게",
+            target="FULL",
+            error_code=None,
+            created_at="2026-08-27T10:00:00Z",
+            started_at="2026-08-27T10:00:01Z",
+            completed_at="2026-08-27T10:00:02Z",
+        ),)
 
     def get_blog_post(self, _: str) -> BlogPostDetail:
         return self.detail
@@ -117,8 +145,9 @@ class FakeApiClient:
         base_version_id: str,
         instruction: str,
         target: str = "FULL",
+        previous_turn_id: str | None = None,
     ) -> AiJob:
-        self.created_with = (post_id, base_version_id, instruction, target)
+        self.created_with = (post_id, base_version_id, instruction, target, previous_turn_id)
         return job("WAITING", "QUEUED")
 
     def get_ai_job(self, _: str) -> AiJob:
@@ -135,22 +164,10 @@ class FakeApiClient:
 
     def get_draft_revision_turns(self, _: str) -> DraftRevisionTurnPage:
         return DraftRevisionTurnPage(
-            items=(DraftRevisionTurn(
-                id="job-1",
-                status="COMPLETED",
-                stage="COMPLETE",
-                base_version_id="version-1",
-                result_version_id="version-2",
-                revision_instruction="더 간결하게",
-                target="FULL",
-                error_code=None,
-                created_at="2026-08-27T10:00:00Z",
-                started_at="2026-08-27T10:00:01Z",
-                completed_at="2026-08-27T10:00:02Z",
-            ),),
+            items=self.revision_turns,
             page=0,
             size=20,
-            total_items=1,
+            total_items=len(self.revision_turns),
             total_pages=1,
         )
 
@@ -176,7 +193,7 @@ def test_starts_revision_and_loads_completed_version_on_refresh() -> None:
     instruction.value = "  더 간결하게 다듬어줘  "
     find_control(root, key="start-revision").on_click(None)
 
-    assert client.created_with == ("post-1", "version-1", "더 간결하게 다듬어줘", "FULL")
+    assert client.created_with == ("post-1", "version-1", "더 간결하게 다듬어줘", "FULL", None)
     assert find_control(root, key="revision-target").disabled is True
     assert find_control(root, key="refresh-revision").disabled is False
 
@@ -280,6 +297,35 @@ def test_shows_persisted_revision_turn_without_exposing_job_id() -> None:
     assert "job-1" not in history
 
 
+def test_shows_linked_turn_with_version_and_instruction_context() -> None:
+    page = FakePage()
+    client = FakeApiClient()
+    client.detail = post(3)
+    client.revision_turns = (
+        DraftRevisionTurn(
+            id="job-2",
+            previous_turn_id="job-1",
+            status="COMPLETED",
+            stage="COMPLETE",
+            base_version_id="version-2",
+            result_version_id="version-3",
+            revision_instruction="마무리를 다듬어줘",
+            target="BODY",
+            error_code=None,
+            created_at="2026-08-27T10:05:00Z",
+            started_at="2026-08-27T10:05:01Z",
+            completed_at="2026-08-27T10:05:02Z",
+        ),
+        client.revision_turns[0],
+    )
+
+    history = find_control(load_post(page, client), key="revision-history").value
+
+    assert "이전 요청에서 이어짐 · v1 → v2 · 더 간결하게" in history
+    assert "job-1" not in history
+    assert "job-2" not in history
+
+
 def test_sends_selected_partial_revision_target() -> None:
     page = FakePage()
     client = FakeApiClient()
@@ -289,4 +335,40 @@ def test_sends_selected_partial_revision_target() -> None:
 
     find_control(root, key="start-revision").on_click(None)
 
-    assert client.created_with == ("post-1", "version-1", "태그만 정리해줘", "TAGS")
+    assert client.created_with == ("post-1", "version-1", "태그만 정리해줘", "TAGS", None)
+
+
+def test_links_revision_when_current_version_is_a_completed_turn_result() -> None:
+    page = FakePage()
+    client = FakeApiClient()
+    client.detail = post(2)
+    root = load_post(page, client)
+    find_control(root, key="revision-instruction").value = "문장을 더 자연스럽게"
+
+    find_control(root, key="start-revision").on_click(None)
+
+    assert client.created_with == (
+        "post-1",
+        "version-2",
+        "문장을 더 자연스럽게",
+        "FULL",
+        "job-1",
+    )
+
+
+def test_user_edited_version_without_exact_result_match_is_unlinked() -> None:
+    page = FakePage()
+    client = FakeApiClient()
+    client.detail = post(3, current_source="USER_EDIT")
+    root = load_post(page, client)
+    find_control(root, key="revision-instruction").value = "사용자 편집 뒤 새 요청"
+
+    find_control(root, key="start-revision").on_click(None)
+
+    assert client.created_with == (
+        "post-1",
+        "version-3",
+        "사용자 편집 뒤 새 요청",
+        "FULL",
+        None,
+    )

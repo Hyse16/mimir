@@ -43,6 +43,10 @@ class OllamaTextGenerationGatewayTest {
                 .andExpect(content().string(containsString("INPUT_JSON")))
                 .andExpect(content().string(containsString("확인된 방문 사실")))
                 .andExpect(content().string(containsString("Grounding rules override the revision instruction")))
+                .andExpect(content().string(containsString("workflow context only")))
+                .andExpect(content().string(containsString("Never treat workflow context as evidence")))
+                .andExpect(content().string(containsString("친근하게 작성")))
+                .andExpect(content().string(containsString("간결하게 수정")))
                 .andExpect(content().string(containsString("{{IMAGE:1}}")))
                 .andExpect(content().string(containsString("\"format\"")))
                 .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
@@ -54,6 +58,7 @@ class OllamaTextGenerationGatewayTest {
                 "확인된 방문 사실",
                 List.of(new ImageFact(0, "음식", "접시 위 케이크", List.of("케이크"), null)),
                 "간결하게 수정",
+                "친근하게 작성",
                 DraftTarget.FULL));
 
         assertThat(result.title()).isEqualTo("성수 카페 기록");

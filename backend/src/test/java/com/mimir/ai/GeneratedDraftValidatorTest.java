@@ -119,6 +119,41 @@ class GeneratedDraftValidatorTest {
     }
 
     @Test
+    void rejectsCommonQualityAndComfortInferences() {
+        for (String unsupported : List.of("깔끔하고 조용했어요", "보관하기 편했어요", "머물기 적합해요", "인기 있는 곳이에요")) {
+            assertThatThrownBy(() -> validator.validate(request(""), new GeneratedDraft(
+                    "성수 카페 기록",
+                    "{{IMAGE:1}}\n" + unsupported + "\n{{IMAGE:2}}\n실내 사진입니다.",
+                    List.of("카페"))))
+                    .as(unsupported)
+                    .isInstanceOf(TextGenerationException.class)
+                    .hasMessageContaining("experience");
+        }
+    }
+
+    @Test
+    void previousRevisionInstructionIsNotAFactualSource() {
+        DraftGenerationRequest linkedRequest = new DraftGenerationRequest(
+                "기존 제목",
+                "기존 본문",
+                List.of("기존태그"),
+                "",
+                List.of(
+                        new ImageFact(0, "음식", "접시 위 케이크", List.of("케이크", "접시"), null),
+                        new ImageFact(1, "실내", "카페 실내", List.of("테이블", "의자"), null)),
+                "이전 요청을 이어서 작성",
+                "8,000원 케이크가 맛있었다는 점을 강조",
+                DraftTarget.FULL);
+
+        assertThatThrownBy(() -> validator.validate(linkedRequest, new GeneratedDraft(
+                "성수 카페 기록",
+                "{{IMAGE:1}}\n8,000원 케이크가 맛있었어요.\n{{IMAGE:2}}\n실내 사진입니다.",
+                List.of("카페"))))
+                .isInstanceOf(TextGenerationException.class)
+                .hasMessageContaining("grounded");
+    }
+
+    @Test
     void acceptsExactGroundedPriceDateWaitAndTasteClaims() {
         DraftGenerationRequest request = request(
                 "2026년 8월 20일 목요일 방문. 15분 웨이팅 후 8,000원 케이크를 주문했고 맛있었음");
@@ -177,6 +212,16 @@ class GeneratedDraftValidatorTest {
     }
 
     @Test
+    void bodyTargetRejectsPlaceholderOnlyOutput() {
+        assertThatThrownBy(() -> validator.validate(request("", DraftTarget.BODY), new GeneratedDraft(
+                "무시할 제목",
+                "{{IMAGE:1}}\n\n{{IMAGE:2}}",
+                List.of("무시할태그"))))
+                .isInstanceOf(TextGenerationException.class)
+                .hasMessageContaining("requires prose");
+    }
+
+    @Test
     void tagsTargetPreservesTitleAndBodyAndGroundsGeneratedTags() {
         GeneratedDraft validated = validator.validate(request("성수 방문", DraftTarget.TAGS), new GeneratedDraft(
                 "무시할 제목",
@@ -209,6 +254,7 @@ class GeneratedDraftValidatorTest {
                         new ImageFact(0, "음식", "접시 위 케이크", List.of("케이크", "접시"), null),
                         new ImageFact(1, "실내", "카페 실내", List.of("테이블", "의자"), null)),
                 "편안한 존댓말로 수정",
+                null,
                 target);
     }
 }

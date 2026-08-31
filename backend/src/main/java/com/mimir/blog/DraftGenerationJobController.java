@@ -34,7 +34,7 @@ public class DraftGenerationJobController {
             @PathVariable UUID postId,
             @Valid @RequestBody CreateDraftGenerationJobRequest request) {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(coordinator.create(
-                postId, request.baseVersionId(), request.revisionInstruction(), request.target()));
+                postId, request.baseVersionId(), request.revisionInstruction(), request.target(), request.previousTurnId()));
     }
 
     @GetMapping("/{postId}/draft-generation-jobs")

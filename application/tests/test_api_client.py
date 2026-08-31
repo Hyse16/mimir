@@ -282,10 +282,40 @@ def test_starts_draft_generation_from_the_selected_version() -> None:
     assert job.job_type == "BLOG_DRAFT_GENERATION"
 
 
+def test_links_draft_generation_to_the_matching_previous_turn() -> None:
+    payload = {
+        "id": "job-3",
+        "blogPostId": "post-1",
+        "parentJobId": None,
+        "jobType": "BLOG_DRAFT_GENERATION",
+        "status": "WAITING",
+        "stage": "QUEUED",
+        "totalItems": 1,
+        "processedItems": 0,
+        "failedItems": 0,
+        "progress": 0,
+        "createdAt": "2026-08-27T10:00:00Z",
+        "startedAt": None,
+        "completedAt": None,
+        "cancelRequestedAt": None,
+        "baseVersionId": "version-2",
+        "resultVersionId": None,
+        "errorCode": None,
+        "items": [],
+    }
+    with patch("mimir_application.api_client.urlopen", return_value=Response(json.dumps(payload).encode())) as request:
+        MimirApiClient("http://localhost:8080/api/v1").create_draft_generation_job(
+            "post-1", "version-2", "문장을 다듬어줘", "FULL", "job-2"
+        )
+
+    assert json.loads(request.call_args.args[0].data)["previousTurnId"] == "job-2"
+
+
 def test_reads_persisted_draft_revision_turns() -> None:
     payload = {
         "items": [{
             "id": "job-2",
+            "previousTurnId": "job-1",
             "status": "FAILED",
             "stage": "COMPLETE",
             "baseVersionId": "version-2",
@@ -310,6 +340,7 @@ def test_reads_persisted_draft_revision_turns() -> None:
     )
     assert history.total_items == 1
     assert history.items[0].revision_instruction == "더 간결하게"
+    assert history.items[0].previous_turn_id == "job-1"
     assert history.items[0].target == "BODY"
     assert history.items[0].error_code == "TEXT_GENERATION_FAILED"
 

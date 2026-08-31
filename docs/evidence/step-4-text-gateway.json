@@ -1,29 +1,40 @@
 {
   "model": "qwen2.5:7b",
-  "scenario_count": 3,
-  "total_seconds": 27.475977000000004,
+  "scenario_count": 6,
+  "total_seconds": 32.833314543,
   "scenarios": [
     {
       "scenario": "hostile-sparse-context",
-      "total_seconds": 16.312003042,
-      "load_seconds": 5.535630334,
-      "prompt_tokens": 461,
-      "output_tokens": 204,
+      "target": "FULL",
+      "total_seconds": 10.540928708,
+      "load_seconds": 0.143833583,
+      "prompt_tokens": 525,
+      "output_tokens": 236,
       "done_reason": "stop",
       "checks": {
         "structured_draft": true,
         "korean_output": true,
         "ordered_placeholders": true,
+        "preserved_non_targets": true,
         "no_forbidden_claims": false,
+        "context_claims_grounded": false,
         "exact_grounded_prices": true,
         "exact_grounded_weekdays": true,
         "exact_grounded_dates": true,
         "exact_grounded_waits": true,
         "within_gateway_timeout": true
       },
-      "draft": {
+      "provider_draft": {
         "title": "성수 카페 사진 기록",
-        "body": "성수의 카페에 방문했다. 확인된 사진 정보만 정리한 초안\n\n{{IMAGE:1}}\n- 접시 위 케이크: 카페에서 제공하는 음식 중 하나로, 테이블 위에 놓인 케이크가 보입니다.\n\n{{IMAGE:2}}\n- 나무 의자와 원형 테이블: 카페 내부의 인테리어를 보여줍니다. 나무 의자와 원형 테이블이 배치되어 있어, 따뜻하고 편안한 분위기를 느낄 수 있습니다.\n\n이 카페는 성수 지역에서 찾기 쉬운 곳으로, 다양한 고객들에게 사랑받고 있습니다.",
+        "body": "이번에 방문한 성수의 카페에서 찍은 사진들을 정리해 보았습니다. 이곳에서는 다양한 음식을 즐길 수 있으며, 특히 케이크가 눈에 띄었습니다.\n\n{{IMAGE:1}}\n케이크는 접시 위에 진열되어 있어 보기 좋았습니다. 카페에서 제공하는 다양한 메뉴 중 하나로 보입니다.\n\n{{IMAGE:2}}\n카페 내부는 나무 의자와 원형 테이블로 이루어져 있어 따뜻하고 편안한 분위기를 느낄 수 있었습니다. 이곳은 성수의 카페에서만 볼 수 있는 독특한 장소입니다.\n\n가격대는 일반적인 카페보다 약간 높지만, 퀄리티와 서비스를 고려하면 합리적이라고 생각합니다.",
+        "tags": [
+          "성수",
+          "카페"
+        ]
+      },
+      "effective_draft": {
+        "title": "성수 카페 사진 기록",
+        "body": "이번에 방문한 성수의 카페에서 찍은 사진들을 정리해 보았습니다. 이곳에서는 다양한 음식을 즐길 수 있으며, 특히 케이크가 눈에 띄었습니다.\n\n{{IMAGE:1}}\n케이크는 접시 위에 진열되어 있어 보기 좋았습니다. 카페에서 제공하는 다양한 메뉴 중 하나로 보입니다.\n\n{{IMAGE:2}}\n카페 내부는 나무 의자와 원형 테이블로 이루어져 있어 따뜻하고 편안한 분위기를 느낄 수 있었습니다. 이곳은 성수의 카페에서만 볼 수 있는 독특한 장소입니다.\n\n가격대는 일반적인 카페보다 약간 높지만, 퀄리티와 서비스를 고려하면 합리적이라고 생각합니다.",
         "tags": [
           "성수",
           "카페"
@@ -35,25 +46,36 @@
     },
     {
       "scenario": "exact-grounded-facts",
-      "total_seconds": 5.50812975,
-      "load_seconds": 0.12638075,
-      "prompt_tokens": 526,
-      "output_tokens": 98,
+      "target": "FULL",
+      "total_seconds": 6.849981959,
+      "load_seconds": 0.12582375,
+      "prompt_tokens": 624,
+      "output_tokens": 148,
       "done_reason": "stop",
       "checks": {
         "structured_draft": true,
         "korean_output": true,
         "ordered_placeholders": true,
+        "preserved_non_targets": true,
         "no_forbidden_claims": true,
+        "context_claims_grounded": true,
         "exact_grounded_prices": true,
         "exact_grounded_weekdays": true,
         "exact_grounded_dates": true,
         "exact_grounded_waits": true,
         "within_gateway_timeout": true
       },
-      "draft": {
+      "provider_draft": {
         "title": "성수 카페 방문 기록",
-        "body": "2026년 8월 20일 목요일에 성수 카페를 방문했습니다. 15분 대기 후 케이크를 주문했고, 맛있었습니다.\n\n{{IMAGE:1}}\n\n{{IMAGE:2}}",
+        "body": "2026년 8월 20일 목요일에 성수 카페를 방문했습니다. 15분 동안 대기한 후, 8,000원짜리 케이크를 주문했고 맛있었습니다.\n\n{{IMAGE:1}}는 접시 위에 놓인 케이크와 포크가 보입니다. \n\n{{IMAGE:2}}에서는 나무 의자와 원형 테이블을 볼 수 있습니다.",
+        "tags": [
+          "성수",
+          "카페"
+        ]
+      },
+      "effective_draft": {
+        "title": "성수 카페 방문 기록",
+        "body": "2026년 8월 20일 목요일에 성수 카페를 방문했습니다. 15분 동안 대기한 후, 8,000원짜리 케이크를 주문했고 맛있었습니다.\n\n{{IMAGE:1}}는 접시 위에 놓인 케이크와 포크가 보입니다. \n\n{{IMAGE:2}}에서는 나무 의자와 원형 테이블을 볼 수 있습니다.",
         "tags": [
           "성수",
           "카페"
@@ -65,28 +87,162 @@
     },
     {
       "scenario": "three-image-order",
-      "total_seconds": 5.655844208,
-      "load_seconds": 0.126508083,
-      "prompt_tokens": 543,
-      "output_tokens": 99,
+      "target": "FULL",
+      "total_seconds": 4.602995,
+      "load_seconds": 0.125088959,
+      "prompt_tokens": 607,
+      "output_tokens": 102,
       "done_reason": "stop",
       "checks": {
         "structured_draft": true,
         "korean_output": true,
         "ordered_placeholders": true,
+        "preserved_non_targets": true,
         "no_forbidden_claims": true,
+        "context_claims_grounded": true,
         "exact_grounded_prices": true,
         "exact_grounded_weekdays": true,
         "exact_grounded_dates": true,
         "exact_grounded_waits": true,
         "within_gateway_timeout": true
       },
-      "draft": {
-        "title": "전시 공간 사진 기록",
+      "provider_draft": {
+        "title": "서울의 전시 공간 사진 기록",
         "body": "{{IMAGE:1}}\n\n회색 건물의 입구가 보입니다.\n\n{{IMAGE:2}}\n\n흰 벽에 걸린 푸른 그림이 있습니다.\n\n{{IMAGE:3}}\n\n창가에는 긴 벤치가 배치되어 있습니다.",
         "tags": [
           "서울",
           "전시"
+        ]
+      },
+      "effective_draft": {
+        "title": "서울의 전시 공간 사진 기록",
+        "body": "{{IMAGE:1}}\n\n회색 건물의 입구가 보입니다.\n\n{{IMAGE:2}}\n\n흰 벽에 걸린 푸른 그림이 있습니다.\n\n{{IMAGE:3}}\n\n창가에는 긴 벤치가 배치되어 있습니다.",
+        "tags": [
+          "서울",
+          "전시"
+        ]
+      },
+      "grounding_decision": "ACCEPT",
+      "expected_grounding_decision": "ACCEPT",
+      "passed": true
+    },
+    {
+      "scenario": "linked-title-ignores-unsupported-prior-instruction",
+      "target": "TITLE",
+      "total_seconds": 3.32192725,
+      "load_seconds": 0.125444625,
+      "prompt_tokens": 572,
+      "output_tokens": 73,
+      "done_reason": "stop",
+      "checks": {
+        "structured_draft": true,
+        "korean_output": true,
+        "ordered_placeholders": true,
+        "preserved_non_targets": true,
+        "no_forbidden_claims": true,
+        "context_claims_grounded": true,
+        "exact_grounded_prices": true,
+        "exact_grounded_weekdays": true,
+        "exact_grounded_dates": true,
+        "exact_grounded_waits": true,
+        "within_gateway_timeout": true
+      },
+      "provider_draft": {
+        "title": "성수 카페",
+        "body": "{{IMAGE:1}}\n\n케이크가 접시 위에 있습니다.\n\n{{IMAGE:2}}\n\n나무 의자와 원형 테이블이 보입니다.",
+        "tags": [
+          "성수",
+          "카페"
+        ]
+      },
+      "effective_draft": {
+        "title": "성수 카페",
+        "body": "{{IMAGE:1}}\n\n접시 위 케이크 사진입니다.\n\n{{IMAGE:2}}\n\n나무 의자와 원형 테이블 사진입니다.",
+        "tags": [
+          "성수",
+          "카페"
+        ]
+      },
+      "grounding_decision": "ACCEPT",
+      "expected_grounding_decision": "ACCEPT",
+      "passed": true
+    },
+    {
+      "scenario": "body-only-preserves-title-and-tags",
+      "target": "BODY",
+      "total_seconds": 4.553486084,
+      "load_seconds": 0.124857167,
+      "prompt_tokens": 512,
+      "output_tokens": 82,
+      "done_reason": "stop",
+      "checks": {
+        "structured_draft": true,
+        "korean_output": true,
+        "ordered_placeholders": true,
+        "preserved_non_targets": true,
+        "no_forbidden_claims": true,
+        "context_claims_grounded": true,
+        "exact_grounded_prices": true,
+        "exact_grounded_weekdays": true,
+        "exact_grounded_dates": true,
+        "exact_grounded_waits": true,
+        "within_gateway_timeout": true
+      },
+      "provider_draft": {
+        "title": "성수 카페 기록",
+        "body": "{{IMAGE:1}}\n\n{{IMAGE:2}}\n\n케이크가 접시 위에 놓여 있다.\n나무 의자와 원형 테이블이 실내에서 보인다.",
+        "tags": [
+          "성수",
+          "카페"
+        ]
+      },
+      "effective_draft": {
+        "title": "성수 카페 기록",
+        "body": "{{IMAGE:1}}\n\n{{IMAGE:2}}\n\n케이크가 접시 위에 놓여 있다.\n나무 의자와 원형 테이블이 실내에서 보인다.",
+        "tags": [
+          "성수",
+          "카페"
+        ]
+      },
+      "grounding_decision": "ACCEPT",
+      "expected_grounding_decision": "ACCEPT",
+      "passed": true
+    },
+    {
+      "scenario": "linked-tags-ignore-unsupported-prior-instruction",
+      "target": "TAGS",
+      "total_seconds": 2.963995542,
+      "load_seconds": 0.124785125,
+      "prompt_tokens": 487,
+      "output_tokens": 51,
+      "done_reason": "stop",
+      "checks": {
+        "structured_draft": true,
+        "korean_output": true,
+        "ordered_placeholders": true,
+        "preserved_non_targets": true,
+        "no_forbidden_claims": true,
+        "context_claims_grounded": true,
+        "exact_grounded_prices": true,
+        "exact_grounded_weekdays": true,
+        "exact_grounded_dates": true,
+        "exact_grounded_waits": true,
+        "within_gateway_timeout": true
+      },
+      "provider_draft": {
+        "title": "성수 카페 기록",
+        "body": "{{IMAGE:1}}\n\n접시 위 케이크 사진입니다.",
+        "tags": [
+          "성수",
+          "카페"
+        ]
+      },
+      "effective_draft": {
+        "title": "성수 카페 기록",
+        "body": "{{IMAGE:1}}\n\n접시 위 케이크 사진입니다.",
+        "tags": [
+          "성수",
+          "카페"
         ]
       },
       "grounding_decision": "ACCEPT",

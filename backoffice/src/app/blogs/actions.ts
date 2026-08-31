@@ -30,6 +30,7 @@ export async function startDraftGenerationAction(postId: string, returnTo: strin
   const baseVersionId = text(formData, "baseVersionId");
   const revisionInstruction = text(formData, "revisionInstruction").trim();
   const target = text(formData, "target");
+  const previousTurnId = text(formData, "previousTurnId") || undefined;
   if (!baseVersionId || !revisionInstruction || !DRAFT_GENERATION_TARGETS.includes(target as (typeof DRAFT_GENERATION_TARGETS)[number])) {
     redirect(detailHref(postId, returnTo, "error=draft-generation-validation"));
   }
@@ -38,6 +39,7 @@ export async function startDraftGenerationAction(postId: string, returnTo: strin
     baseVersionId,
     revisionInstruction,
     target as (typeof DRAFT_GENERATION_TARGETS)[number],
+    previousTurnId,
   );
   if (!job) redirect(detailHref(postId, returnTo, "error=draft-generation-start"));
 

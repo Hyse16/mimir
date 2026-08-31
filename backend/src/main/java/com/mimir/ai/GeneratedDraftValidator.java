@@ -31,7 +31,8 @@ public class GeneratedDraftValidator {
     private static final List<String> EXACT_CONTEXT_ONLY_CLAIMS = List.of(
             "맛있", "맛없", "달콤", "고소", "산미", "풍미", "식감",
             "서비스", "불친절", "추천", "만족", "아쉬", "좋", "훌륭", "아름답",
-            "현대적", "고급", "편안", "따뜻", "분위기", "독특", "매력", "생기", "시선을 끌", "눈을 즐겁",
+            "현대적", "고급", "편안", "편리", "편했", "깔끔", "조용", "적합", "인기", "퀄리티",
+            "따뜻", "분위기", "독특", "매력", "생기", "시선을 끌", "눈을 즐겁",
             "월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일",
             "오늘", "어제", "그제", "지난주", "이번 주");
     private static final List<List<String>> CONTEXT_ONLY_CLAIMS = List.of(
@@ -58,6 +59,7 @@ public class GeneratedDraftValidator {
         }
         if (target == DraftTarget.FULL || target == DraftTarget.BODY) {
             requireOrderedPlaceholders(body, request.imageFacts().size());
+            requireBodyProse(body);
         }
         requireGroundedClaims(generatedContent(target, title, body, tags), request.visitContext());
         return new GeneratedDraft(title, body, tags);
@@ -89,6 +91,12 @@ public class GeneratedDraftValidator {
         List<Integer> expected = IntStream.rangeClosed(1, imageCount).boxed().toList();
         if (!actual.equals(expected)) {
             throw new TextGenerationException("Generated image placeholders must appear exactly once in display order.");
+        }
+    }
+
+    private void requireBodyProse(String body) {
+        if (IMAGE_PLACEHOLDER.matcher(body).replaceAll("").isBlank()) {
+            throw new TextGenerationException("Generated body requires prose in addition to image placeholders.");
         }
     }
 

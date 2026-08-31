@@ -31,8 +31,9 @@ class DraftGenerationJobCoordinator {
             UUID postId,
             UUID baseVersionId,
             String revisionInstruction,
-            DraftGenerationTarget target) {
-        UUID jobId = service.create(postId, baseVersionId, revisionInstruction, target);
+            DraftGenerationTarget target,
+            UUID previousTurnId) {
+        UUID jobId = service.create(postId, baseVersionId, revisionInstruction, target, previousTurnId);
         taskExecutor.execute(() -> runner.run(jobId));
         return queryService.detail(jobId);
     }

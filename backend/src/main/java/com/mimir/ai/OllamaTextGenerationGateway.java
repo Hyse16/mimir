@@ -22,7 +22,9 @@ import tools.jackson.databind.ObjectMapper;
 class OllamaTextGenerationGateway implements TextGenerationGateway {
 
     private static final String PROMPT = """
-            Write a Korean Naver blog draft using only the supplied user context, existing draft, and visible image facts.
+            Write a Korean Naver blog draft using only the supplied visit context and visible image facts as factual sources.
+            The base draft, current revision instruction, and previous revision instruction are workflow context only.
+            Never treat workflow context as evidence for a factual claim.
             Never invent prices, wait times, taste, service quality, visit dates, orders, opinions, or personal experiences.
             Grounding rules override the revision instruction. Omit any requested detail that is not explicitly supported.
             Describe visible facts neutrally. Do not infer quality, atmosphere, comfort, emotion, popularity, or recommendations.
@@ -32,7 +34,9 @@ class OllamaTextGenerationGateway implements TextGenerationGateway {
             Target FULL means regenerate title, body, and tags, and still include every required image placeholder.
             For FULL or BODY, use every image exactly once as {{IMAGE:1}}, {{IMAGE:2}}, and so on in display order.
             For FULL or BODY, keep image placeholders on their own line and connect surrounding prose only to grounded facts.
-            Apply the revision instruction while preserving facts. Return only the requested structured output.
+            For FULL or BODY, include Korean prose describing at least one grounded fact in addition to the placeholders.
+            Apply the current revision instruction in light of the previous revision instruction while preserving grounded facts.
+            Return only the requested structured output.
             """;
 
     private final RestClient client;

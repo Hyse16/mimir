@@ -84,6 +84,7 @@ class AiJob:
 @dataclass(frozen=True)
 class DraftRevisionTurn:
     id: str
+    previous_turn_id: str | None
     status: str
     stage: str
     base_version_id: str
@@ -281,15 +282,19 @@ class MimirApiClient:
         base_version_id: str,
         revision_instruction: str,
         target: str = "FULL",
+        previous_turn_id: str | None = None,
     ) -> AiJob:
+        body = {
+            "baseVersionId": base_version_id,
+            "revisionInstruction": revision_instruction,
+            "target": target,
+        }
+        if previous_turn_id is not None:
+            body["previousTurnId"] = previous_turn_id
         return self._ai_job(self._request(
             "POST",
             f"/blog-posts/{post_id}/draft-generation-jobs",
-            {
-                "baseVersionId": base_version_id,
-                "revisionInstruction": revision_instruction,
-                "target": target,
-            },
+            body,
         ))
 
     def get_draft_revision_turns(
@@ -510,6 +515,11 @@ class MimirApiClient:
             raise TypeError
         return DraftRevisionTurn(
             id=str(payload["id"]),
+            previous_turn_id=(
+                str(payload["previousTurnId"])
+                if payload.get("previousTurnId") is not None
+                else None
+            ),
             status=str(payload["status"]),
             stage=str(payload["stage"]),
             base_version_id=str(payload["baseVersionId"]),

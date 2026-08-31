@@ -88,6 +88,7 @@ export type AiJob = {
 
 export type DraftRevisionTurn = {
   id: string;
+  previousTurnId?: string | null;
   status: AiJob["status"];
   stage: AiJob["stage"];
   baseVersionId: string;
@@ -282,6 +283,7 @@ function isAiJob(value: unknown): value is AiJob {
 function isDraftRevisionTurn(value: unknown): value is DraftRevisionTurn {
   return isRecord(value) &&
     typeof value.id === "string" &&
+    (value.previousTurnId === undefined || typeof value.previousTurnId === "string" || value.previousTurnId === null) &&
     ["WAITING", "RUNNING", "CANCEL_REQUESTED", "COMPLETED", "PARTIAL_FAILED", "FAILED", "CANCELLED"].includes(String(value.status)) &&
     ["QUEUED", "IMAGE_ANALYSIS", "CONTEXT_ASSEMBLY", "DRAFT_GENERATION", "COMPLETE"].includes(String(value.stage)) &&
     typeof value.baseVersionId === "string" &&
@@ -456,13 +458,24 @@ export async function createDraftGenerationJob(
   baseVersionId: string,
   revisionInstruction: string,
   target: DraftGenerationTarget,
+  previousTurnId?: string,
 ): Promise<AiJob | null> {
   const payload = await sendJson(`/blog-posts/${encodeURIComponent(postId)}/draft-generation-jobs`, "POST", {
     baseVersionId,
     revisionInstruction,
     target,
+    ...(previousTurnId ? { previousTurnId } : {}),
   });
   return isAiJob(payload) ? payload : null;
+}
+
+export function previousRevisionTurnId(
+  turns: DraftRevisionTurn[],
+  baseVersionId: string,
+): string | undefined {
+  return turns.find(
+    (turn) => turn.status === "COMPLETED" && turn.resultVersionId === baseVersionId,
+  )?.id;
 }
 
 export async function getAiJob(jobId: string): Promise<AiJob | null> {

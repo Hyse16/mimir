@@ -204,8 +204,81 @@ class DraftGenerationJobIntegrationTest {
         assertThat(history.items().get(1).revisionInstruction()).isEqualTo("첫 번째 수정 요청");
         assertThat(history.items().get(1).status()).isEqualTo(AiJobStatus.COMPLETED);
         assertThat(history.items().get(1).resultVersionId()).isEqualTo(generated.currentVersionId());
+        assertThat(history.items()).extracting(DraftGenerationApiModels.DraftRevisionTurnResponse::previousTurnId)
+                .containsOnlyNulls();
         assertThat(history.items()).extracting(DraftGenerationApiModels.DraftRevisionTurnResponse::target)
                 .containsOnly(DraftGenerationTarget.FULL);
+    }
+
+    @Test
+    void linksACompletedTurnWhoseResultIsTheNewBaseAndSuppliesItsInstructionAsWorkflowContext() {
+        var post = analyzedPost("확인된 사실", 1);
+        UUID firstJobId = draftJobService.create(post.id(), post.currentVersionId(), "첫 요청");
+        draftJobRunner.run(firstJobId);
+        UUID firstResultId = blogService.detail(post.id()).currentVersionId();
+
+        UUID secondJobId = draftJobService.create(
+                post.id(), firstResultId, "후속 요청", DraftGenerationTarget.BODY, firstJobId);
+        draftJobRunner.run(secondJobId);
+
+        assertThat(textGateway.lastRequest().revisionInstruction()).isEqualTo("후속 요청");
+        assertThat(textGateway.lastRequest().previousRevisionInstruction()).isEqualTo("첫 요청");
+        var newest = draftJobService.history(post.id(), 0, 20).items().getFirst();
+        assertThat(newest.id()).isEqualTo(secondJobId);
+        assertThat(newest.previousTurnId()).isEqualTo(firstJobId);
+    }
+
+    @Test
+    void rejectsPreviousTurnFromAnotherPost() {
+        var firstPost = analyzedPost("첫 글 사실", 1);
+        UUID firstJobId = draftJobService.create(firstPost.id(), firstPost.currentVersionId(), "첫 요청");
+        draftJobRunner.run(firstJobId);
+        var otherPost = analyzedPost("다른 글 사실", 1);
+
+        assertThatThrownBy(() -> draftJobService.create(
+                otherPost.id(), otherPost.currentVersionId(), "후속 요청", DraftGenerationTarget.FULL, firstJobId))
+                .isInstanceOf(InvalidAiJobOperationException.class)
+                .hasMessageContaining("same blog post");
+    }
+
+    @Test
+    void rejectsFailedPreviousTurnWithoutAResult() {
+        var post = analyzedPost("확인된 사실", 1);
+        textGateway.failNextGeneration();
+        UUID failedJobId = draftJobService.create(post.id(), post.currentVersionId(), "실패할 요청");
+        draftJobRunner.run(failedJobId);
+
+        assertThatThrownBy(() -> draftJobService.create(
+                post.id(), post.currentVersionId(), "후속 요청", DraftGenerationTarget.FULL, failedJobId))
+                .isInstanceOf(InvalidAiJobOperationException.class)
+                .hasMessageContaining("completed with a result");
+    }
+
+    @Test
+    void rejectsPreviousTurnWhenItsResultDoesNotEqualTheNewBase() {
+        var post = analyzedPost("확인된 사실", 1);
+        UUID firstJobId = draftJobService.create(post.id(), post.currentVersionId(), "첫 요청");
+        draftJobRunner.run(firstJobId);
+        var generated = blogService.detail(post.id());
+        var edited = blogService.addVersion(post.id(), new CreateDraftVersionRequest(
+                generated.currentVersionId(), "사용자 제목", "사용자 본문", List.of("사용자"), null));
+
+        assertThatThrownBy(() -> draftJobService.create(
+                post.id(), edited.currentVersionId(), "후속 요청", DraftGenerationTarget.FULL, firstJobId))
+                .isInstanceOf(InvalidAiJobOperationException.class)
+                .hasMessageContaining("result must be the new turn base");
+    }
+
+    @Test
+    void rejectsAnImageAnalysisJobAsPreviousTurn() {
+        var post = analyzedPost("확인된 사실", 1);
+        UUID imageJobId = imageJobService.create(post.id());
+        imageJobRunner.run(imageJobId);
+
+        assertThatThrownBy(() -> draftJobService.create(
+                post.id(), post.currentVersionId(), "후속 요청", DraftGenerationTarget.FULL, imageJobId))
+                .isInstanceOf(InvalidAiJobOperationException.class)
+                .hasMessageContaining("draft generation job");
     }
 
     @Test
@@ -326,10 +399,12 @@ class DraftGenerationJobIntegrationTest {
 
         private volatile Runnable callback;
         private volatile boolean fail;
+        private volatile DraftGenerationRequest lastRequest;
 
         void reset() {
             callback = null;
             fail = false;
+            lastRequest = null;
         }
 
         void afterNextGeneration(Runnable nextCallback) {
@@ -340,8 +415,13 @@ class DraftGenerationJobIntegrationTest {
             fail = true;
         }
 
+        DraftGenerationRequest lastRequest() {
+            return lastRequest;
+        }
+
         @Override
         public GeneratedDraft generate(DraftGenerationRequest request) {
+            lastRequest = request;
             if (fail) {
                 fail = false;
                 throw new IllegalStateException("simulated local text provider failure");
